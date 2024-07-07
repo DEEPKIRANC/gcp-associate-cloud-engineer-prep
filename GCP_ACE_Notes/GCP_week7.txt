@@ -1,0 +1,73 @@
+ => To grant permission to a user to view the costs of all projects under a Cloud Billing account, give the user permission to view the costs for a Cloud Billing account 
+(billing.accounts.getSpendingInformation). To grant permission to a user to view the costs for a specific project, give the user view permissions for individual projects 
+(billing.resourceCosts.get).
+
+=> Billing Account Administrator
+(roles/billing.admin)	Manage billing accounts (but not create them).
+
+=> Billing Account Costs Manager
+(roles/billing.costsManager)	Manage budgets and view and export cost information of billing accounts (but not pricing information).
+Also, does not allow the linking or unlinking of projects or otherwise managing the properties of the billing account.
+
+=> Billing Account Viewer
+(roles/billing.viewer)	View billing account cost information and transactions.granted to finance teams, it provides access to spend information, but does not confer the
+ right to link or unlink projects or otherwise manage the properties of the billing account.
+
+=> Billing Account User
+(roles/billing.user)	Link projects to billing accounts. When granted in combination with Project Creator, the two roles allow a user to create new projects linked to the billing 
+account on which the Billing Account User role is granted. Or, when granted in combination with the Project Billing Manager role, the two roles allow a user to link and unlink 
+projects on the billing account on which the Billing Account User role is granted.
+
+=> Project Billing Manager
+(roles/billing.projectManager)	Link/unlink the project to/from a billing account. Organization, folder, or project.
+
+When granted in combination with the Billing Account User role, the Project Billing Manager role allows a user to attach the project to the billing account, but does not grant any 
+rights over resources. Project Owners can use this role to allow someone else to manage the billing for the project without granting them resource access.
+
+
+Random notes - 
+
+A. Create a new Service that points to the existing deployment.
+Why is this correct?
+A service is how we expose deployments. It's a persistent endpoint that we can interact with, and it will send the traffic over to the pods in the deployment.
+
+You can set the budget to track against a billing account or project.
+
+Edit the number of replicas in the YAML file and rerun the kubectl apply.
+Why is this correct?
+If you create a deployment with the kubectl create or apply commands, then you can update with kubectl apply -f file.yaml.
+
+This is because you installed google-cloud-sdk with a package manager like apt-get or yum. so they request that we disable the component manager when shipping the Cloud SDK.
+
+Each project can have only 1 App Engine Application!!
+
+INITIAL_DELAY: The number of seconds that a new VM takes to initialize and run its startup script. During a VM's initial delay period, the MIG ignores unsuccessful health checks because the VM might be in the startup process. This prevents the MIG from prematurely recreating a VM.
+
+- App Engine Does not use deployment manager
+- Standard App engine yaml file contains project info as well, but flexible App engine doesn't.
+
+- Create an instance template for the instances. Set the "˜Automatic Restart' to on. Set the "˜On-host maintenance' to Migrate VM instance. Add the instance template to an instance group.
+
+- Go to the Logs ingestion window in Stackdriver Logging, and disable the log source for the GKE container resource.
+
+- Deploy the new version in the same application (App engine standard environment) and use the --splits option to give a weight of 99 to the current version and a weight of 1 to the new version
+
+- Perform a rolling-action start-update with maxSurge set to 1 and maxUnavailable set to 0.
+
+- Google recommends using push subscriptions to consume messages from a Pub/Sub topic on Cloud Run. Although it is possible to use Pub/Sub pull subscriptions, pull subscriptions require 
+you to monitor message delivery latency and manually scale the number of instances to maintain a healthy delivery latency.
+
+- Cloud Run services in the same project can be deployed to different regions. In App Engine, all services in the project are in the same region.
+
+- To use a service account from outside of Google Cloud, such as on other platforms or on-premises, you must first establish the identity of the service account. Public/private key pairs
+ provide a secure way of accomplishing this goal. When you create a service account key, the public portion is stored on Google Cloud, while the private portion is available only to you. 
+
+- You can create external tables in BigQuery that point to the 5-TB AVRO file stored in Cloud Storage. External tables allow you to query data stored in Cloud Storage without the need to 
+load the data into BigQuery. 
+
+- Google Cloud’s Data Catalog is a fully managed and scalable metadata management service that empowers organizations to quickly discover, manage, and understand all their data in 
+Google Cloud. It offers a simple and easy-to-use search interface for data discovery. By searching for “employee_ssn” in the Data Catalog, you can quickly find all tables across all 
+datasets and projects that contain this column. This approach is more efficient and requires less effort compared to writing and maintaining scripts or jobs.
+
+
+- Moving disks across regions is possible, but moving instances across regions is not i.e it can be moved across zones in the same regio

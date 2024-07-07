@@ -1,0 +1,232 @@
+---------------ABOUT IAM---------------------
+
+1. Organization has 2 roles - Org admin (control over all resources, useful for auditing) and Project creator (control who could create projects)
+
+For creating and managing organizations -
+
+1. Cloud super admin
+
+ - for recovery of any project or accounts
+ - for assigning org admin roles
+ - controls lifecycle of google workspace/cloud identity account
+
+2. Org admin
+
+ - defines IAM policies
+ - structure of resource hierarchy
+ - delegate responsibility over different resources via IAM policies
+
+NOTE - this role does not include the permission to perform other actions, such as creating folders.
+To get these permissions, an organization admin must assign additional roles to their account.
+
+Resource Manager roles =>
+
+1) Organization - Admin, Viewer
+2) Folder - Admin (full control over folders), Creator (browse hierarchy and create folders), Viewer (view folders & projects below resource)
+3) Project - Creator (create & migrate projects into organization), Deleter (delete projects)
+
+Compute Engine IAM roles ->
+
+1) compute admin
+2) network admin (can create/modify/delete networks except firewall & ssl certs i.e readonly perms for firewall/ssl and view ephemeral IP address of an instance)
+3) storage admin
+
+For example, if your company has someone who manages project images, and you don't want them to have the editor role in the project.
+Grant their account the storage admin role on that project.
+
+NOTE - Custom roles are not maintained by Google.
+
+=> A Workspace domain represents a virtual group of all the Google accounts that have been created in an organization's Workspace account.
+Workspace domains represent your organization's internet domain name, such as example.com, and when you add a user to
+your Workspace domain, a new Google account is created for the user inside this virtual group, such as username@example.com.
+
+
+NOTE - Now it’s important to note that you cannot use IAM to create or manage your users or groups.
+Instead, you can use Cloud Identity or Workspace to create and manage users.
+
+
+Policies -> bindings -> binds members to roles -> roles consists of set of permissions
+
+=> Recommender identifies excess permissions using policy insights.
+Policy insights are ML-based findings about permission usage in your project, folder, or organization.
+
+=> allow policies, also known as IAM policies, which are attached to resources. The allow policy controls access to the resource itself 
+and any descendants of that resource that inherit the allow policy.
+
+=> deny policies > allow policies
+
+=> IAM conditions - allow you to define and enforce conditional, attribute-based access control for Google Cloud resources.
+
+=> An organization policy is a configuration of restrictions, defined by configuring a constraint with the desired restrictions for that organization.
+An organization policy can be applied to the organization node, and all of its folders or projects within that node.
+
+Exceptions to these policies can be made, but only by a user who has the organization policy admin role.
+
+=> Using Google Cloud Directory Sync, your administrators can log in and manage Google Cloud resources using the same usernames and passwords they already use.
+This tool synchronizes users and groups from your existing Active Directory or LDAP system with the users and groups in your Cloud Identity domain.
+The synchronization is one-way only; which means that no information in your Active Directory or LDAP map is modified.
+
+
+SERVICE ACCOUNTS
+
+- User created (custom)
+- built in (for compute engine default service account)
+- Google APIs service account
+
+Apart from the default service account, all projects come with a Google Cloud APIs service account, identifiable by the email: project-number@cloudservices.gserviceaccount.com.
+
+NOTE - For custom service accounts, use IAM roles instead of access scopes.
+
+
+Service Account -> IAM Roles -> CRUD manage disks, compute engine, services etc
+Google groups -> ServiceAccountRole -> Service Account
+
+NOTE - Use Google managed service account keys instead of user managed service account keys
+
+=>  recommend using Cloud Identity Aware Proxy or Cloud IAP. Cloud IAP lets you establish a central authorization layer for applications accessed by HTTPS. So you can use an application 
+level access control model instead of relying on network level firewalls. Applications and resources protected by Cloud IAP can only be accessed through the proxy by users and groups with 
+the correct Cloud IAM role.
+
+----------------------STORAGE-------------------------------
+
+=> An ACL is a mechanism you use to define who has access to your buckets and objects, as well as what the level of access is they have. The maximum number of ACL entries you can create
+ for a bucket or object is 100.
+=> ACL consists of scope and permissions.
+
+=> For some applications, it is easier and more efficient to grant limited-time access tokens that can be used by any user, instead of using account-based authentication for controlling resource access.
+Signed-urls can do this.
+
+=> You can assign a lifecycle management configuration to a bucket.
+The configuration is a set of rules that apply to all the objects in the bucket.
+So when an object meets the criteria of one of the rules, Cloud Storage automatically performs a specified action on the object.
+
+=. The Autoclass feature automatically transitions objects in your bucket to appropriate storage classes based on the access pattern of each object.
+
+---------------------CLOUD SQL-------------
+
+=> Through synchronous replication to each zone's persistent disk, all writes made to the primary instance are replicated to disks in both zones before a transaction is reported as committed.
+
+=> In the event of an instance or zone failure, the persistent disk is attached to the standby instance, and it becomes the new primary instance. This process is known as failover.
+
+=> use cloud spanner for horizontal scalability
+
+NOTE - if you’re connecting an application that is hosted within the same Google Cloud project as your Cloud SQL instance, and it is
+collocated in the same region, choosing the Private IP connection will provide you with the most performant and secure connection using private connectivity.
+
+NOTE - If the application is hosted in another region or project, or if you are trying
+to connect to your Cloud SQL instance from outside of Google Cloud, you have 3 options.
+In this case, I recommend using the Cloud SQL Auth Proxy, which handles authentication, encryption, and key rotation for you.
+
+
+=> In summary, if you need to store more than 1 TB of structured data, have very high volume of writes, need read/write latency of
+less than 10 milliseconds along with strong consistency, or need a storage service that is compatible with the HBase API, consider using Cloud Bigtable.
+If you don’t need any of these and are looking for a storage service that scales down well, consider using Firestore.
+
+
+
+---------------------Resource Manager-----------
+
+-> Images, snapshots, and networks are global resources; External IP addresses are regional resources; and instances and disks are zonal resources.
+
+-> Labels are utility for organizing Google Cloud resources.
+Labels are key value pairs that you can attach to your resources, like VMs, disks, snapshots and images.
+You can create and manage labels using the Google Cloud Console, gcloud or the Resource Manager API.
+
+=> Labels are propagated through billing (user friendly key-value pairs)
+=> tags are used for instances only (primarily for networking purposes i.e firewall rules)
+
+=> I recommend labeling all your resources and exporting your billing data to BigQuery to analyze your spend.
+BigQuery is Google's scalable, fully managed enterprise data warehouse with SQL and fast response times.
+
+
+
+----------------Resource Monitoring----------------------------------
+
+=> A metrics scope is the root entity that holds monitoring and configuration information in Cloud Monitoring.
+Each metrics scope can have between 1 and 375 monitored projects.
+Now, monitoring data for all projects in that scope will be visible. 
+A metrics scope contains the custom dashboards, alerting policies, uptime checks, notification channels, and group definitions that you use with your monitored projects.
+
+
+=> All users of Google Cloud’s operations suite with access to that metrics scope have access to all data by default.
+This means that a role assigned to one person on one project applies equally to all projects monitored by that metrics scope.
+In order to give people different roles per-project and to control visibility to data, consider placing the monitoring of those projects in separate metrics scopes.
+
+=> For each uptime check, you can create an alerting policy and view the latency of each global location.
+
+=> The Ops Agent collects metrics inside the VM, not at the hypervisor level.
+The Ops Agent is the primary agent for collecting telemetry data from your Compute Engine instances.
+Ops agent installed on the Compute Engine collects data beyond the system metrics.
+The collected metric is then used by Cloud Monitoring to create Dashboards, alerts, uptime checks and notifications to drive observability for workloads running in your application.\
+
+
+=> Logs are only retained for 30 days, but you can export your logs to Cloud Storage buckets, BigQuery datasets, and Pub/Sub topics.
+Exporting logs to Cloud Storage makes sense for storing logs for more than 30 days, but why should you export to BigQuery or Pub/Sub?
+Exporting logs to BigQuery allows you to analyze logs and even visualize them in Looker Studio.
+BigQuery runs extremely fast SQL queries on gigabytes to petabytes of data.
+
+=> f you want to visualize your logs, I recommend connecting your BigQuery tables to Looker Studio.
+Looker Studio transforms your raw data into the metrics and dimensions that you can use to create easy-to-understand reports and dashboards.
+
+=> Cloud Trace API
+
+=> Poorly performing code increases the latency and cost of applications and web services every day.
+Cloud Profiler continuously analyzes the performance of CPU or memory-intensive functions executed across an application.
+
+
+NOTE - For performance-sensitive workloads such as online transaction processing (OLTP), a general guideline is to ensure that your instance has enough memory to contain the entire 
+working set and accommodate the number of active connections.
+
+NOTE - SSD (solid-state drive) is the best choice for most use cases. HDD (hard-disk drive) offers lower performance, but storage costs are significantly reduced, so HDD may be preferable
+for storing data that is infrequently accessed and does not require very low latency.
+
+NOTE - When your application does not reside in the same VPC connected network and region as your Cloud SQL instance, use a proxy to secure its external connection.
+
+
+NOTE - Health checks determine which instances of a Load Balancer can receive new connections. For Internal load balancing, the health check probes to your load balanced instances come from 
+addresses in the ranges 130.211.0.0/22 and 35.191.0.0/16. Your firewall rules must allow these connections.
+
+Note: Managed instance groups offer autoscaling capabilities that allow you to automatically add or remove instances from a managed instance group based on increases or decreases in load. 
+Autoscaling helps your applications gracefully handle increases in traffic and reduces cost when the need for resources is lower. You just define the autoscaling policy and the autoscaler
+ performs automatic scaling based on the measured load.
+
+
+NOTE - Every instance in a VPC network has a default network interface. You can create additional network interfaces attached to your VMs. Multiple network interfaces enable you to create 
+configurations in which an instance connects directly to several VPC networks (up to 8 interfaces, depending on the instance's type). The number of interfaces allowed in an instance is 
+dependent on the instance's machine type and the number of vCPUs. The e2-standard-4 allows up to 4 network interfaces.
+There is a direct relationship between the storage capacity and its throughput.
+
+
+
+NOTE - Note: You are able to ping privatenet-us-vm by its name because VPC networks have an internal DNS service that allows you to address instances by their DNS names rather than their 
+internal IP addresses. When an internal DNS query is made with the instance hostname, it resolves to the primary interface (nic0) of the instance. Therefore, this only works for 
+privatenet-us-vm in this case.
+
+
+NOTE - In a multiple interface instance, every interface gets a route for the subnet that it is in. In addition, the instance gets a single default route that is associated with the 
+primary interface eth0. Unless manually configured otherwise, any traffic leaving an instance for any destination other than a directly connected subnet will leave the instance via 
+the default route on eth0.
+
+
+NOTE - Note: Networks use network tags to identify which VM instances are subject to certain firewall rules and network routes. Later in this lab, you create a firewall rule to allow 
+HTTP access for VM instances with the web-server tag. Alternatively, you could check the Allow HTTP traffic checkbox, which would tag this instance as http-server and create the tagged
+ firewall rule for tcp:80 for you.
+
+NOTE - allow HTTP access/ attach a network tag and configure a firewall for accessing external IP of any VM
+
+As expected, you are only able to HTTP access the external IP address of the blue server as the allow-http-web-server only applies to VM instances with the web-server tag.
+
+
+Note: The Compute Engine default service account does not have the right permissions to allow you to list or delete firewall rules. The same applies to other users who do not have the right roles.
+
+Note: As expected, the Network Admin role has permissions to list but not modify/delete firewall rules
+
+
+
+Google Cloud HTTP(S) load balancing is implemented at the edge of Google's network in Google's points of presence (POP) around the world. User traffic directed to an HTTP(S) load balancer 
+enters the POP closest to the user and is then load balanced over Google's global network to the closest backend that has sufficient capacity available.
+
+Cloud Armor IP allowlist/denylist enable you to restrict or allow access to your HTTP(S) load balancer at the edge of the Google Cloud, as close as possible to the user and to malicious
+ traffic. This prevents malicious users or traffic from consuming resources or entering your Virtual Private Cloud (VPC) networks.
+
+=> HTTP(S) load balancing supports both IPv4 and IPv6 addresses for client traffic. Client IPv6 requests are terminated at the global load balancing layer, then proxied over IPv4 to your backends.

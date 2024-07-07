@@ -1,0 +1,237 @@
+IAAS
+- Create VM instance (create an empty VM with basic config)
+
+PAAS - the service itself
+- Create SQL instance (backup, recovery, maintenance etc.. everything is available)
+
+SaaS - a finished product (for end users - without the user having to config anything)
+- Microsoft 365
+- Workspace
+
+IaaS, PaaS, SaaS - common across all the cloud providers
+
+
+Data Centers
+Regions - atleast 3 zones
+Zones - individual building in a region
+
+Point of Access (gray points) - connect google network with internet
+Reduce latency and improve performance & reliability by caching content
+
+- Everything is encrypted by default (customisable)
+
+Open Source - Tensorflow (TPU) for machine learning
+
+- GKE - 85% managed (Google Kubernetes Engine)
+Note - google made kubernetes source code open source, and MS, Amazon created their own kubernetes engine using this code.
+
+
+Billing & Pricing
+
+1. VM (per second)
+2. PaaS (features)
+
+- IAM and admin
+ - Organisation policies
+
+Projects
+ - all has to go inside projects (except org node, folder structure)
+ - Project ID 
+ - Projet number (unique)
+ - IAM -> Manage Resources/Create a project
+
+In GCP, a project is a collection of resources that you use to build and run your applications. It includes:
+- APIs and services: Compute Engine, Cloud Storage, Cloud SQL, and more.
+- Billing: You are billed for the resources that you use in your project.
+- IAM: Controls who has access to your project's resources.
+- quotas: Limits on how much of a resource you can use.
+
+You can create multiple projects to organize your resources and track your costs.
+
+
+
+REsource Manager
+- delete project - scheduled for 30 days before deletion
+
+Permissions (hierarchical/cumulative)
+- no permissions by default
+
+Org policies - what resources are available in underlying projects
+deny policy - supersede every other permission
+
+Yes, deny policies follow the principle of superseding in GCP. In your example, if Mark is denied admin access at the folder level (which grants wider permissions), the deny policy for write access on a project within that folder will be irrelevant. The folder-level denial already supersedes any permissions granted at a lower level.
+
+=> Service Account
+
+- custom service accounts, access scope controlled by cloud IAM
+Yes, service accounts in GCP can be customized in a variety of ways. You can:
+- Set IAM permissions to control who can access and use the service account.
+- Create custom roles with specific permissions for your service account.
+- Attach service accounts to Google Cloud resources to grant them access to those resources.
+- Use the gcloud command-line tool to manage service accounts.
+
+For more information, see the official documentation: https://cloud.google.com/iam/docs/service-accounts.
+
+
+A service account is a special type of Google account that belongs to your application or a virtual machine (VM) instead of an individual end user. Your application uses the service account to call Google APIs, so that the users aren't directly involved.
+
+In short, a service account is a non-human Google account that represents an application or VM. It is used to access Google Cloud resources and APIs.
+
+
+Yes, a default service account is created by default when you create a project in GCP.
+
+The service account is named "Compute Engine default service account" and it has the following attributes:
+- It has the IAM basic Editor role, which allows it to access most Google APIs.
+- It is attached to all VMs that you create by using the Google Cloud CLI or the Google Cloud console.
+- It is only deleted when you delete the project.
+
+
+roles -> permissions
+
+To allow a resource for a specific project and disable it for the rest of the projects in GCP, you can use IAM policies.
+
+
+=> google cloud shell (temporary VM machine) - gcloud (command).  5GB of persistence storage (paid feature) to save the scripts, configurations etc in the cloud shell VM
+
+Labs
+
+careful about machines/users/resources!!!
+use incognito!
+
+
+=> Virtual Machines and Networks
+
+- default network inside VPC networks is not production ready! custom network config is required
+- associate the subnets (location specific) - google
+
+- all zones in a region would get same subnets 
+
+
+In GCP, the main difference between VMs and containers is the level of virtualization:
+
+- VMs: virtualize the entire hardware stack, including the CPU, memory, storage, and network. They run a full operating system and can be used to run any software.
+- Containers: virtualize only the software layer, including the application code and its dependencies. They share the underlying operating system with other containers, which makes them more lightweight and portable.
+
+While the region may have multiple zones, a single zone failure can disrupt your VPC resources. To achieve high availability, you need additional configurations like regional resources or HA VPN.
+
+
+=> AUTOSCALING (scalability - add more VMs based on a template and customer demand for load balancing)
+
+
+=> Firewall in VPC - network tags could be used
+
+=> privately join separate networks internally - through VPC peering (google cloud VPC)
+
+=> hub network is created - projects are connected to this shared VPC hub project
+
+Yes, you can connect two VPCs to each other in GCP using:
+
+- VPC Network Peering: Connects two VPC networks so that resources in each network can communicate with each other.
+- Cloud VPN: Creates a secure, private connection between your on-premises network and your VPC network.
+- Direct Peering: Connects your VPC network to a Google Cloud service, such as Cloud Storage or Cloud SQL.
+
+domain name - should match with public IP address of load balancer
+
+In GCP, multiple levels of load balancing can be used to:
+- Distribute traffic across multiple regions and zones: This can improve reliability and performance by reducing latency and increasing availability.
+- Scale your application up or down as needed: You can add or remove load balancers as your traffic demands change.
+- Secure your application: You can use load balancers to implement security policies, such as firewall rules and DDoS protection.
+
+- Offload tasks from your application servers: Load balancers can handle tasks such as SSL termination and HTTP/2 multiplexing, which can free up your application servers to focus on serving requests.
+
+Yes, external IPs are chargeable and are not required for each VM. it publicly accessible from the internet, and thus it is chargeable. However, you don't need to give external IP to every VM on your project.
+
+
+cloud dns - SaaS
+edge caching
+create domain name -> add zones -> add records
+
+
+IpSec (VPN) - transfer secure data over a route (few limitations, everyone can use the same route)
+Dedicated Interconnect - compared to a tunnel (highly reliable)
+Partner Interconnect
+Direct Peering - in case no VPC/VM is present, connect to point of presence (google edge point) directly to access gmail, youtube, firestore etc.
+Carrier Peering
+
+
+
+--------------------------------------------------------------------------DAY 2--------------------------------------------------------------------------------------
+
+- Object Storage (edit/update not possible -> updates i.e downloadable, blob storage, archives etc)
+
+Bucket creation -
+
+Location Type 
+1. Region (lowest latency in a single region)
+ - image uploaded -> triplicated and uploaded to 3 data centers (zones) in a single region -> single point of failure
+
+2. Dual Region
+
+Storage Class
+- contract b/w you & google to pay based on usage (access based)
+
+Standard - frequently accessed (best for short term storage)
+Nearline - once a month (best for backups)
+Coldline - once a quarter (best for disaster recovery)
+Archive - long term digital preservation (once a year)
+
+Autoclass - automatically transitions each object to standard/nearline based on usage (object level activity)
+NOTE - default can't be changed, so autoclass is a good option in the beginning.
+
+- Soft delete
+- Object Versioning (dont't delete the original object, update the name and date -> store the new updated file)
+- Retention (compliance for all the objects) -> bucket & object retention policy
+
+Data Encryption - google managed key & Customer managed E key
+
+=> Transfer Service (for migration from one bucket to another)
+
+- ONline transfer, storage transfer service and transfer appliance (physical transfer - ability to store upto petabytes of data)
+
+
+
+=> Cloud SQL 
+- instance could be used at only 1 region at a time (2 instances at diff regions can't be synced together)
+- only 1 primary writable instance at 1 region
+- readonly replicas could be created
+- can't access the underlying database server
+- doesn't have its own database
+- mysql, postgresql, ms sql
+
+=> Cloud Spanner
+- fully managed relational database
+- multiple instances could be used at diff regions
+- all spanner servers would be synced in real time
+- strongly consistent
+- costly
+- gmail (use case)
+- useful for high numbers of I/O operations per second (user can pick this number)
+- google SQL
+
+=> Firestore
+- nosql -> more about processing and less about ordering / relationing
+- online & offline data sync (read, write, update queries)
+- ideal for web & mobile backends
+- pricing based on => read/write delete docs, queries, amount of storaeg used, amount of network bandwidth used
+
+=> Cloud Bigtable
+- nosql big data database service
+- superfast with high throughput
+- consistent low latency
+- capturing events or time-series for IOT (use case)
+- HBase REST server (data service layer)
+- supports both batch (time specific batch jobs) and stream (realtime stream of data) 
+
+BigQuery & Bigtable are different
+
+Bigquery - for analysis of data (not updating the data in database)
+
+
+
+
+--------------------------------------- GCP Get Certified 2nd Stage --------------------------------------------
+
+Permissions priority - Predefined > Custom > Basic
+Assigning basic role is not recommended by Google.
+
+Create Billing account and link it to the projects

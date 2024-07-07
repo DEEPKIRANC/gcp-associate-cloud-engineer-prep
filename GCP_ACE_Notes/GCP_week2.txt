@@ -1,0 +1,193 @@
+1. Enable Vm_Tier1 to increase the network bandwidth of the vm
+2. ingress/egress traffic
+
+=> Public OS images are provided and maintained by Google, open source communities, and third-party vendors. By default, all Google Cloud projects have access to these OS images and can 
+use them to create VM instances. Custom OS images are available only to your Google Cloud project.
+
+=> In contrast to custom images that capture the contents of a single disk, machine images — which can be created whether the source instance is running or stopped — contain multiple 
+disks as well as other data required to create a new instance.
+
+=> Once the disk is created, it can be used to create the custom image as usual. While snapshots cannot be shared across projects, custom images can. This means that custom images are 
+a valid approach to sharing snapshots between projects. This method is often used to migrate VMs from one project to another.
+
+=> Spot (Preemptible) VMs
+
+=> Shielded VMs are virtual machines (VMs) on Google Cloud hardened by a set of security controls that help defend against rootkits and bootkits. Using Shielded VMs helps
+ protect enterprise workloads from threats like remote attacks, privilege escalation, and malicious insiders.
+
+
+=> If a VM shares its Compute Engine server with VMs from other Google Cloud projects, it is a multi-tenant VM. If a VM doesn't share its Compute Engine server with VMs from other projects, 
+it is a sole-tenant VM. VMs are multi-tenant by default. 
+
+=> Sole-tenancy lets you have exclusive access to a sole-tenant node, which is a physical Compute Engine server that is dedicated to hosting only your project's VMs. Use sole-tenant nodes 
+to keep your VMs physically separated from VMs in other projects
+
+=> Sustained Use Discounts vs Committed Use Discounts
+
+Sustained Discounts 
+
+- Whenever you use an applicable resource for more than a fourth of a billing month, Compute Engine automatically gives you sustained use discounts for every incremental hour that you 
+continue to use that resource. The discount increases incrementally with usage and you can get up to a 30% net discount off of the resource cost for virtual machine (VM) instances that 
+run the entire month.
+
+- Sustained use discounts don't apply to VMs created using the App Engine (standard and flexible) environments and Dataflow.
+
+- Sustained use discounts apply to only N1, N2, N2D, C2, M1, and M2 machine types
+
+Committed Use Discounts
+
+- These GCP discounts are based on a 1-year or 3-year commitment. Naturally, the longer commitment offers the deepest discount.
+
+- Committed-use discounts have two types: spend-based (depends on a committed minimum spend) and resource-based (depends on a committed minimum vCPU and memory utilization). 
+
+- Also, spot instances can deliver drastic savings if you have a fault-tolerant workload. Spot instances are VMs that use shared resources. Therefore, they cost a lot less. 
+However, the drawback is that they can be preempted at any time.
+
+- Right-sizing
+
+
+
+NOTE - To recover from a corrupted disk / Os not booting properly,(On high-level) just attach the corrupted disk as non-boot disk to another VM and troubleshoot.
+
+
+=> 3 types of policies for autoscaling
+
+- CPU utilization (create a new if utilization > 60%)
+- HTTP(S) load balancing service capacity
+- cloud monitoring metrics
+
+
+--------------------------------NETWORKING DEEP DIVE----------------------
+
+1. IP addresses - Internal, external, range.
+
+3 types of VPC network - 
+
+-> Auto mode (default) - 1 subnet per region, fixed /20 subnet IP ranges per region (expandable upto /16)
+All of these subnets fit within the 10.128.0.0/9 CIDR block.
+
+-> Custom mode - no subnets are automatically created
+You decide which subnets to create, in regions you choose, and using IP ranges you specify. These IP ranges cannot overlap between subnets of the same network.
+
+=> The traffic between VMs C and D isn’t actually touching the public internet, but is going through the Google Edge routers (scenario where C & D are on different networks but in same region)
+
+=> Because VM instances within a VPC network can communicate privately on a global scale, a single VPN can securely connect your on-premises network to your Google Cloud network.
+Even though the two VM instances are in separate regions (us-west1 and us-east1), they leverage Google’s private network to communicate between each other and to an on-premises network 
+through a VPN gateway.
+
+=> every subnet has four reserved IP addresses in its primary IP range. And subnets can cross zones (operates at regional level)
+
+=> even though the two virtual machines in this example are in different zones, they still communicate with each other using the same subnet IP address. 
+This means that a single firewall rule can be applied to both VMs, even though they are in different zones.
+
+=> Also, avoid creating large subnets. Overly large subnets are more likely to cause CIDR range collisions when using Multiple Network Interfaces and VPC Network Peering, or when 
+configuring a VPN or other connections to an on-premises network. Therefore, do not scale your subnet beyond what you actually need.
+
+
+=> Google cloud has 2 types of internal DNS - Zonal (recommended) and Global.
+
+=> an instance is not aware of any external IP address assigned to it. Instead, the network stores a lookup table that matches external IP addresses with the internal IP addresses 
+of the relevant instances. 
+
+=> Alias IP Ranges : Alias IP Ranges let you assign a range of internal IP addresses as an alias to a virtual machine's network interface. This is useful if you have multiple
+ services running on a VM, and you want to assign a different IP address to each service.You just draw the alias IP range from the local subnet's primary or secondary CIDR ranges.
+
+
+=> ROUTES - mapping of IP addresses to destination
+
+- a route is created when a netowrk is created
+- a route is created when a subnet is created
+- Each route in the Routes collection may apply to one or more instances. A route applies to an instance if the network and instance tags match.
+
+=> Every virtual machine instance in the network is directly connected to the core router, and all packets leaving a virtual machine instance are first handled at this layer before they are
+forwarded to their next hop. The virtual network router selects the next hop for a packet by consulting the routing table for that instance.
+
+=> You can control ingress connections from a VM instance by constructing inbound connection conditions using source CIDR ranges, protocols, or ports.
+
+=> As for the difference in egress traffic to the same zone, Compute Engine cannot determine the zone of a virtual machine through the external IP address. Therefore, this traffic is 
+treated like egress between zones in the same region.
+
+=> default-allow-icmp
+default-allow-rdp
+default-allow-ssh
+default-allow-internal
+These firewall rules allow ICMP, RDP, and SSH ingress traffic from anywhere (0.0.0.0/0) and all TCP, UDP, and ICMP traffic within the network (10.128.0.0/9). 
+
+=> Note: The External IP addresses for both VM instances are ephemeral. If an instance is stopped, any ephemeral external IP addresses assigned to the instance are released back into the general Compute Engine pool and become available for use by other projects.
+
+When a stopped instance is started again, a new ephemeral external IP address is assigned to the instance. Alternatively, you can reserve a static external IP address, which assigns the address to your project indefinitely until you explicitly release it.
+
+
+=> Note: You can SSH because of the allow-ssh firewall rule, which allows incoming traffic from anywhere (0.0.0.0/0) for tcp:22. The SSH connection works seamlessly because Compute Engine generates an SSH key for you and stores it in one of the following locations:
+By default, Compute Engine adds the generated key to project or instance metadata.
+
+=> custom mode network is recommended for production usage (define own subnets for regions)
+
+=> ote that the IP CIDR ranges of these networks do not overlap. This allows you to set up mechanisms such as VPC peering between the networks. If you specify IP CIDR ranges that are different from your on-premises network, you could even configure hybrid connectivity using VPN or Cloud Interconnect.
+
+
+=> Note: You can ping the external IP address of all VM instances, even though they are in either a different zone or VPC network. This confirms that public access to those instances is only controlled by the ICMP firewall rules that you established earlier.
+
+=> You can ping the internal IP address of mynet-eu-vm because it is on the same VPC network as the source of the ping (mynet-us-vm), even though both VM instances are in separate zones, regions, and continents!
+
+=> You cannot ping the internal IP address of managementnet-us-vm and privatenet-us-vm because they are in separate VPC networks from the source of the ping (mynet-us-vm), even though they are all in the same zone.
+
+=> Note: In order to connect to your private instance using SSH, you need to open an appropriate port on the firewall. IAP connections come from a specific set of IP addresses (35.235.240.0/20). Therefore, you can limit the rule to this CIDR range.
+
+=> When instances do not have external IP addresses, they can only be reached by other instances on the network via a managed VPN gateway or via a Cloud IAP tunnel. Cloud IAP enables context-aware access to VMs via SSH and RDP without bastion hosts.
+
+=> Private Google Access is enabled at the subnet level. When it is enabled, instances in the subnet that only have private IP addresses can send traffic to Google APIs and services through the default route (0.0.0.0/0) with a next hop to the default internet gateway.
+
+=> Configure a Cloud NAT gateway, which allows vm-internal (which doesn't have external IP address but has private cloud access enabled in subnet) to reach the internet.
+this is needed for updates and patches.
+
+=> Cloud NAT is a regional resource. You can configure it to allow traffic from all ranges of all subnets in a region, from specific subnets in the region only, or from specific primary 
+and secondary CIDR ranges only.
+
+=> Note: The Cloud NAT gateway implements outbound NAT, but not inbound NAT. In other words, hosts outside of your VPC network can only respond to connections initiated by your instances;
+they cannot initiate their own, new connections to your instances via NAT.
+
+
+
+-------------------------------------VIRTUAL MACHINES DEEP DIVE------------------------------------------------
+
+=> Normally the boot disk defaults to being deleted automatically when the instance is deleted. But sometimes you will want to override this behavior. This feature is very important 
+because you cannot create an image from a boot disk when it is attached to a running instance. So you would need to disable Delete boot disk when instance is deleted to enable creating
+ a system image from the boot disk.
+
+=> Preemptible VMs, Spot VMs, Shielded VMs and Confidential VMs
+
+=> A machine image is a Compute Engine resource that stores all the configuration, metadata, permissions, and data from one or more disks required to create a virtual machine (VM) instance.
+
+=> You can use a machine image in many system maintenance scenarios, such as creation, backup and recovery, and instance cloning.
+
+
+IMP NOTE - If you start the Minecraft server again now, it is tied to the life of your SSH session: that is, if you close your SSH terminal, the server is also terminated. 
+To avoid this issue, you can use screen, an application that allows you to create a virtual terminal that can be "detached," becoming a background process, or "reattached," becoming 
+a foreground process. When a virtual terminal is detached to the background, it will run whether you are logged in or not.
+
+
+------------------IAM and permissions-------------------------------
+
+=> Cloud storage - Storage object viewer (doesn't have the Project Viewer role, so that user can't see the project or any of its resources in the Console. However, this user has 
+specific access to Cloud Storage, the Storage Object Viewer role which could be checked via shell )
+
+-------------Monitoring-----------------
+
+=> The Cloud Monitoring agent is a collected-based daemon that gathers system and application metrics from virtual machine instances and 
+sends them to Monitoring. By default, the Monitoring agent collects disk, CPU, network, and process metrics. Configuring the Monitoring agent allows third-party applications to get the 
+full list of agent metrics. 
+
+=> Note: It is best practice to run the Cloud Logging agent on all your VM instances.
+
+=> uptime checks and alerting policy
+
+=> could not delete notification channel (email) from alerting 
+
+ERROR MESSAGE - Could not delete "projects/qwiklabs-gcp-01-0fe9ad6f9e7a/notificationChannels/16824559951327555218" because it is still being referenced by: "projects/qwiklabs-gcp-01-0fe9ad6f9e7a/alertPolicies/15420184879748188302"
+
+
+------------------CLoud Functions-------------------
+
+=> When deploying a new function, you must specify --trigger-topic, --trigger-bucket, or --trigger-http. When deploying an update to an existing function, the function keeps the 
+existing trigger unless otherwise specified.

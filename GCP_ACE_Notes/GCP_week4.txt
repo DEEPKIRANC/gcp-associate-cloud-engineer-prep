@@ -1,0 +1,368 @@
+=> Classic VPN securely connects your on-premises network to your Google Cloud VPC network through an IPsec VPN tunnel.
+
+=> Traffic traveling between the two networks is encrypted by one VPN gateway, then decrypted by the other VPN gateway.
+This protects your data as it travels over the public internet, and that’s why Classic VPN is useful for low-volume data connections.
+
+=> Max MTU - 1460 (on premise VPN gateway)  - 2 tunnels need to be configured to establish connection b/w 2 VPN network gateways (GCP network & on-premise network)
+
+=> Dynamic routing via cloud router i.e VPN tunnel uses cloud router to establish a BGP session b/w VPC and VPC peer network gateway.
+
+=> The cloud VPN service uses the public internet, but traffic is encrypted and provides access to internal IP addresses which is a great addition to direct & carrier network peering services.
+And it falls under Layer 3 network peering type.
+
+=> Dedicated interconnect (direct connection) - On-prem network must physically meet google's network at colocation facility (to set a BGP session b/w cloud router & on-prem router & network peering)
+
+=> Partner interconnect (connection via service provider if you aren't near a colocation facility) 
+
+=> Cross cloud interconnect (GCP Cloud with AWS/Azure/Alibaba cloud) - supports 2 connection sizes (10GBPS and 100 Gbps)
+
+NOTE - If you need a lower cost solution, have lower bandwidth needs, or you are experimenting with migrating your workloads to Google Cloud, you can choose Cloud VPN.
+
+NOTE - If you need an enterprise-grade connection to Google Cloud that has higher throughput, you can choose Dedicated Interconnect or Partner Interconnect.
+
+NOTE - If you need to connect to another cloud service provider, choose Cross-Cloud Interconnect.
+
+NOTE - Google recommends using Cloud Interconnect instead of Direct Peering and Carrier Peering, which you would only use in certain circumstances.
+
+DIRECT PEERING
+
+- With this connection, you will be able to exchange Internet traffic between your network and Google's at one of the Google's broad-reaching edge network locations.
+- Direct peering with Google is done by exchanging BGP routes between Google and the peering entity.
+- Doesn't have an SLA
+
+CARRIER PEERING 
+
+- Doesn't have an SLA
+- Peering through service provider to establish a connection b/w your network and Google's public network
+
+NOTE - Interconnect services provide direct access to RFC1918 IP addresses in your VPC, with an SLA. Peering services, in contrast, offer access to Google public IP addresses only, without an SLA.
+
+NOTE -If you want Google-managed encryption, choose the Cloud VPN over Interconnect option.
+
+
+=> Shared VPC allows an organization to connect resources from multiple projects to a common Virtual Private Cloud (VPC) network so that they can communicate with each other securely 
+and efficiently by using internal IP addresses from that network (HOST project and standalone project). Shared VPC only works within the same organization.
+Shared VPC only works across projects.Shared VPC is a centralized approach to multi-project networking, because security and network policy occurs in a single designated VPC network.
+
+=> VPC Network Peering, in contrast, allows private RFC 1918 connectivity across two VPC networks, regardless of whether they belong to the same project or the same organization.
+
+=> Each organization has its own organization node, VPC network, VM instances, Network Admin, and Instance Admin.
+In order for VPC Network Peering to be established successfully, the Producer Network Admin needs to peer the Producer
+Network with the Consumer Network, and the Consumer Network Admin needs to peer the Consumer Network with the Producer Network.
+When both peering connections are created, the VPC Network Peering session becomes Active and routes are exchanged.
+if you want to configure private communication between VPC networks in the same project, you have to use VPC Network Peering.
+In contrast, VPC Network Peering is a decentralized approach.
+
+=> NOTE - Historically, such projects would consider external IP addresses or VPNs to facilitate private communication between VPC networks.
+However, VPC Network Peering does not incur the network latency, security, and cost drawbacks that are present when using external IP addresses or VPNs.
+
+
+=> Cloud Router requires you to use a private ASN, but your on-premises ASN can be public or private.If you are using Cloud Router with Partner Interconnect, you must specify ASN 16550.
+The ASN (Autonomous System Number) provides routing and location information for traffic flowing to this IP address.
+ASN - Autonomous System no
+
+=> HA VPN is a regional resource and cloud router that by default only sees the routes in the region in which it is deployed. To reach instances in a different region than the cloud
+ router, you need to enable global routing mode for the VPC. This allows the cloud router to see and advertise routes from other regions.
+
+
+=> When using a single HA VPN gateway, we recommend using an active-passive routing configuration. With this configuration, the observed bandwidth capacity at the time of normal tunnel 
+operation matches the bandwidth capacity observed during failover. This type of configuration is easier to manage because the observed bandwidth limit stays constant, except for the 
+multiple gateway scenario described previously.
+
+=> When using multiple HA VPN gateways, we recommend using an active-active routing configuration. With this configuration, the observed bandwidth capacity at the time of normal tunnel 
+operation is twice that of the maximum bandwidth capacity. However, this configuration effectively under provisions the tunnels and can cause dropped traffic in case of failover.
+
+
+
+--------------------------------DEEP DIVE ON LOAD BALANCERS---------------------
+
+Normally, HTTP(S) load balancing uses a round-robin algorithm to distribute requests among available instances. This can be overridden with session affinity.
+Session affinity attempts to send all requests from the same client to same virtual machine instance. Balancing mode (check this)
+
+Cross-region load balancing & content-based load balancing
+
+
+--------HTTP(S)
+
+A network endpoint group, or NEG, is a configuration object that specifies a group of backend endpoints or services. A common use case for this configuration is deploying services in containers.
+Zonal and internet NEGs define how endpoints should be reached, whether they are reachable, and where they are located.
+
+A hybrid connectivity NEG points to Traffic Director services running outside of Google Cloud.
+
+A serverless NEG points to Cloud Run, App Engine, Cloud Functions services residing in the same region as the NEG
+
+
+--------Cloud CDN
+
+Using cache modes, you can control the factors that determine whether or not Cloud CDN caches your content by using cache modes.
+Cloud CDN offers three cache modes, which define how responses are cached, whether or not Cloud CDN respects cache directives sent by the origin, and how cache TTLs are applied.
+The available cache modes are USE_ORIGIN_HEADERS, CACHE_ALL_STATIC and FORCE_CACHE_ALL.
+
+You should make sure not to cache private, per-user content (such as dynamic HTML or API responses) if using a shared backend with this mode configured.
+
+----------SSL proxy load balancers
+
+terminated at the global load balancing layer.From there a separate connection established to the closest back-end instance. Now the traffic between the proxy and the backend can use SSL and TCP.
+
+
+----------TCP proxy load balancers
+
+TCP proxy is a global load balancing service for unencrypted, non-HTTP traffic.
+
+
+----------Network Load balancers
+
+Network load balancing is a regional, non-proxied load balancing service. all traffic is passed through the load balancer instead of being proxied, and the traffic
+can only be balanced between VM instances that are in the same region, unlike a global load balancer.
+
+The architecture of a network load balancer depends on whether you use a back-end service-based network load balancer or a target-pool-based network load balancer.
+New network load balancers can be created with a regional back-end service that defines the behavior of the load balancer and how it distributes traffic across its back-end instance groups.
+
+Back-end services enable new features that are not supported with legacy target pools, such as support for non-legacy health
+checks, TCP, SSL, HTTP, HTTPS and HTTP/2 auto-scaling with managed instance groups, connection draining and a configurable failover policy.
+
+The target pools can only be used with forwarding rules that can handle TCP and UDP traffic.
+Now, each project can have up to 50 target pools, and each target pool can only have one health check.
+
+
+
+NOTE - ONLY HTTP(S), SSL PROXY AND TCP PROXY load balancers support IPv6 clients
+
+
+
+
+--------------------Terraform-------------------
+
+Terraform takes this main.tf file and uses it as the specification for what to create. Once we have completed the main.tf file, we can deploy the defined infrastructure in Cloud Shell.
+
+We use the command terraform init to initialize the new Terraform configuration. The terraform init command makes sure that the Google provider plugin is downloaded and installed in a 
+subdirectory of the current working directory, along with various other bookkeeping files.
+
+=> The terraform plan command performs a refresh, unless explicitly disabled, and then determines what actions are necessary to achieve the desired state specified in the configuration files.
+This command is a convenient way to check whether the execution plan for a set of changes matches your expectations without making any changes to real resources or to the state.
+
+=> The terraform apply command creates the infrastructure defined in the main.tf file.
+Once this command has completed you will be able to access the defined infrastructure.
+
+
+-------------------Managed Services---------------------------
+
+
+As an alternative to infrastructure automation (using terraform), you can eliminate the need to create infrastructure by leveraging a managed service.
+
+=> Cloud Dataflow is a managed service for executing a wide variety of data processing patterns. It's essentially a fully managed service for 
+transforming and enriching data in stream and batch modes with equal reliability and expressivenes (Apache Beam)
+Cloud Dataflow is also tightly coupled with other GCP services, like Stackdriver, so you can set up
+priority alerts and notifications to monitor your pipeline and the quality of data coming in and out. Also provides automatic provisioning of clusters.
+
+After you transform the data with Cloud Dataflow, you can analyze it in BigQuery, AI Platform or even Cloud Bigtable.
+
+=> Cloud Dataprep can be leveraged to prepare raw data from BigQuery,
+Cloud Storage or a file upload before ingesting it into a transformational pipeline like Cloud Dataflow.
+The refined data can then be exported to BigQuery or Cloud Storage for analysis and machine learning
+
+=> Cloud Dataproc is a fast, easy to use, fully managed cloud service for running Apache Spark and Apache Hadoop clusters in a simpler way.
+
+Cloud Dataproc has built-in integration with other GCP services such as BigQuery, Cloud Storage, Cloud Bigtable, Stackdriver Logging and Stackdriver Monitoring.
+
+NOTE - If you're already using Spark, Hadoop, Pig or Hive, you don't even need to learn new tools or APIs to use Cloud Dataproc.
+This makes it easy to move existing projects into Cloud Dataproc without redevelopment. Manual provisioning of cluster (the hands-on DEVOPS approach)
+
+
+Speaking of infrastructure, most of the services that we covered are serverless, this doesn't mean that there aren't any actual servers processing your data.
+Serverless means that servers or Compute Engine instances are obfuscated so that you don't have to worry about the infrastructure.
+
+NOTE - Cloud DataProc isn't a serverless service, because you were able to view and manage the underlying master and worker instances.
+
+
+
+-------------LAB NOTES---------
+
+The Google Cloud VM backend instances that you setup in Task 3 will not be configured with external IP addresses.
+
+Instead, you will setup the Cloud NAT service to allow these VM instances to send outbound traffic only through the Cloud NAT, and receive inbound traffic through the load balancer.
+
+NOTE - Pass through load-balancers load balance TCP/UDP traffic without proxying the traffic to the backends. They preserve the source-ip address of the packet. They also support 
+load-balancing of UDP, ICMP, SCTP, GRE traffic.
+
+NOTE - Google Cloud HTTP(S) load balancing is implemented at the edge of Google's network in Google's points of presence (POP) around the world. User traffic directed to an HTTP(S) 
+load balancer enters the POP closest to the user and is then load-balanced over Google's global network to the closest backend that has sufficient available capacity.
+
+NOTE - Google Cloud Router dynamically exchanges routes between your Virtual Private Cloud (VPC) and on-premises networks by using Border Gateway Protocol (BGP)
+
+
+NOTE - You have created a custom image that multiple identical webservers can be started from. At this point, you could delete the webserver disk.
+
+While creating VM -> select boot disk -> keep disk when deleted (check this option) -> create image from the saved disk -> use the image for creating MIGs and templates
+
+NOTE - For custom images, your storage cost is based on the image’s archive size.
+
+For public images, there is no storage cost, and so the archive size is not shown.
+
+=> Managed instance group health checks proactively signal to delete and recreate instances that become unhealthy.
+
+=> HTTP(S) load balancing supports both IPv4 and IPv6 addresses for client traffic. Client IPv6 requests are terminated at the global load balancing layer and then proxied over IPv4 to your backends.
+
+
+
+Key Point: Custom roles enable you to enforce the principle of least privilege, ensuring that the user and service accounts in your organization have only the permissions essential to 
+performing their intended functions.
+Note: You can create a custom role at the organization level and at the project level. However, you cannot create custom roles at the folder level.
+
+
+
+----- MORE ABOUT IAM roles--------------------------------------------
+
+
+
+<service>.<resource>.<verb> i.e compute.instances.list
+
+NOTE - You cannot grant custom roles from one project or organization on a resource owned by a different project or organization.
+
+
+NOTE - Users who are not owners, including organization administrators, must be assigned either the Organization Role Administrator role (roles/iam.organizationRoleAdmin) or the IAM Role 
+Administrator role (roles/iam.roleAdmin). The IAM Security Reviewer role (roles/iam.securityReviewer) enables the ability to view custom roles but not administer them.
+
+The custom roles user interface is in the Cloud Console under IAM Roles. It is only available to users who have permissions to create or manage custom roles. By default, only project 
+owners can create new roles. Project owners can control access to this feature by granting IAM Role Administrator role to others on the same project; for organizations, 
+only Organization Administrators can grant the Organization Role, Administrator role.
+
+=> Before you create a custom role, you might want to get the metadata for both predefined and custom roles. Role metadata includes the role ID and permissions contained in the role.
+
+NOTE - For example, if two owners for a project try to make conflicting changes to a role at the same time, some changes could fail.
+
+Cloud IAM solves this problem using an etag property in custom roles. This property is used to verify if the custom role has changed since the last request. When you make a request 
+to Cloud IAM with an etag value, Cloud IAM compares the etag value in the request with the existing etag value associated with the custom role. It writes the change only if the
+etag values match.
+
+NOTE - When a role is disabled, any policy bindings related to the role are inactivated, meaning that the permissions in the role will not be granted, even if you grant the role to a user.
+
+The easiest way to disable an existing custom role is to use the --stage flag and set it to DISABLED.
+
+NOTE - After the role has been deleted, existing bindings remain, but are inactive. The role can be undeleted within 7 days. After 7 days, the role enters a permanent deletion process 
+that lasts 30 days. After 37 days, the Role ID is available to be used again.
+
+Note: If a role is being phased out, change its role.stage property to DEPRECATED, and set the `deprecation_message` to let users know what alternative roles should be used 
+or where to get more information.
+
+
+
+-----------------------------------------SERVICE ACCOUNTS----------------------------------------------
+
+
+Types of service accounts
+
+
+1.User-managed service accounts
+
+When you create a new Cloud project using Google Cloud console and if Compute Engine API is enabled for your project, a Compute Engine Service account is created for you by default. 
+It is identifiable using the email: PROJECT_NUMBER-compute@developer.gserviceaccount.com
+
+If your project contains an App Engine application, the default App Engine service account is created in your project by default. It is identifiable using the email:
+PROJECT_ID@appspot.gserviceaccount.com
+
+2. Google Managed service accounts
+
+Google APIs service account - This service account is designed specifically to run internal Google processes on your behalf and is not listed in the Service Accounts section of the console. 
+By default, the account is automatically granted the project editor role on the project and is listed in the IAM section of the console. This service account is deleted only when the 
+project is deleted.
+
+NOTE - When you create a new Cloud project, Google Cloud automatically creates one Compute Engine service account and one App Engine service account under that project. You can create up to 
+98 additional service accounts to your project to control access to your resources.
+
+=> When granting IAM roles, you can treat a service account either as a resource or as an identity.
+
+Your application uses a service account as an identity to authenticate to Google Cloud services. For example, if you have a Compute Engine Virtual Machine (VM) running as a service account,
+you can grant the editor role to the service account (the identity) for a project (the resource).
+
+At the same time, you might also want to control who can start the VM. You can do this by granting a user (the identity) the serviceAccountUser role for the service account (the resource).
+
+
+
+
+------------------------Identity Aware Proxies (IAP)---------------------
+
+=> Identity-Aware Proxy (IAP) is a Google Cloud service that intercepts web requests sent to your application, authenticates the user making the request using the Google Identity Service, 
+and only lets the requests through if they come from a user you authorize. In addition, it can modify the request headers to include information about the authenticated user.
+
+Role - IAP SECURED WEB APP USER
+
+NOTE - Used for integrating sign-in pages for your apps ex - use gemini with vscode
+
+NOTE - if IAP is turned off, everyone can access the app. Since the application is now unprotected, a user could send a web request that appeared to have passed through IAP.
+
+EX - curl -X GET <your-url-here> -H "X-Goog-Authenticated-User-Email: totally fake email"
+
+There is no way for the application to know that IAP has been disabled or bypassed. For cases where that is a potential risk, Cryptographic Verification shows a solution.
+
+=> If there is a risk of IAP being turned off or bypassed, your app can check to make sure the identity information it receives is valid. This uses a third web request header added by IAP,
+ called X-Goog-IAP-JWT-Assertion. The value of the header is a cryptographically signed object that also contains the user identity data. Your application can verify the digital signature 
+and use the data provided in this object to be certain that it was provided by IAP without alteration.
+
+NOTE - Notice that the email address provided by the verified method does not have the accounts.google.com: prefix.
+
+If IAP is turned off or bypassed, the verified data would either be missing, or invalid, since it cannot have a valid signature unless it was created by the holder of Google's private keys.
+
+
+---------------------Cloud KMS---------------
+
+
+Note: CryptoKeys and KeyRings cannot be deleted in Cloud KMS!
+
+Open the Key management through the Console by going to the Navigation menu > Security > Key Management.
+A cryptographic key is a resource that is used for encrypting and decrypting data or for producing and verifying digital signatures
+
+Using the encrypt endpoint, you can send the base64-encoded text you want to encrypt to the specified key.
+
+=> In KMS, there are two major permissions to focus on. One permissions allows a user or service account to manage KMS resources, the other allows a user or service account to use keys to
+ encrypt and decrypt data.
+
+The permission to manage keys is cloudkms.admin, and allows anyone with the permission to create KeyRings and create, modify, disable, and destroy CryptoKeys. 
+The permission to encrypt and decrypt is cloudkms.cryptoKeyEncrypterDecrypter, and is used to call the encrypt and decrypt API endpoints.
+
+=> Since CryptoKeys belong to KeyRings, and KeyRings belong to Projects, a user with a specific role or permission at a higher level in that hierarchy inherits the same permissions on 
+the child resources. For example, a user who has the role of Owner on a Project is also an Owner on all the KeyRings and CryptoKeys in that project. Similarly, if a user is granted the
+ cloudkms.admin role on a KeyRing, they have the associated permissions on the CryptoKeys in that KeyRing.
+
+=> To view the activity for any resource in KMS, go to Navigation menu > Cloud Overview > Activity tab. This will take you to the Cloud Activity UI and then click on View Log Explorer, 
+Select Cloud KMS Key Ring as the Resource Type and you should see the creation and all modifications made to the KeyRing.
+
+
+
+
+-----------------Kubernetes Clusters---------------
+
+When you create a private cluster, you must specify a /28 CIDR range for the VMs that run the Kubernetes master components and you need to enable IP aliases.
+Next you'll create a cluster named private-cluster, and specify a CIDR range of 172.16.0.16/28 for the masters. When you enable IP aliases, you let Kubernetes Engine automatically
+create a subnetwork for you.
+
+You'll create the private cluster by using the --private-cluster, --master-ipv4-cidr, and --enable-ip-alias flags.
+
+Subnet details - 
+
+In the output you can see that one secondary range is for pods and the other secondary range is for services.
+
+Notice that privateIPGoogleAccess is set to true. This enables your cluster hosts, which have only private IP addresses, to communicate with Google APIs and services.
+
+=> At this point, the only IP addresses that have access to the master are the addresses in these ranges:
+
+The primary range of your subnetwork. This is the range used for nodes.
+The secondary range of your subnetwork that is used for pods.
+To provide additional access to the master, you must authorize selected address ranges.
+
+=> Now that you have access to the master from a range of external addresses, you'll install kubectl so you can use it to get information about your cluster. 
+For example, you can use kubectl to verify that your nodes do not have external IP addresses.
+
+
+
+=> Once you have created the new private cluster you must test that it is correctly configured by connecting to it from the jumphost, orca-jumphost, in the management subnet 
+orca-mgmt-subnet. As this compute instance is not in the same subnet as the private cluster you must make sure that the master authorized networks for the cluster includes the 
+internal ip-address for the instance, and you must specify the --internal-ip flag when retrieving cluster credentials using the gcloud container clusters get-credentials command.
+
+
+=> Tip 2. When adding the internal ip-address of the orca-jumphost machine to the list of authorized addresses for the private Kubernetes Engine cluster you should use a /32 netmask to
+ ensure that only the specific compute instance is authorized.
+
+=> Tip 3. You cannot connect directly to a Kubernetes Engine private cluster from a VPC or other network outside of the VPC the private cluster has been deployed to if the 
+enable-private-endpoint option has been specified. This represents the highest security option for a private cluster and you must use a jumphost, or a proxy within the same VPC 
+as the cluster, and you must use that jumphost or proxy to connect to the internal managment ip-address for the cluster.
