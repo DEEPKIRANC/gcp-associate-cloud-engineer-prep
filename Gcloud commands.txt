@@ -1,0 +1,969 @@
+Gcloud commands - 
+
+1. gcloud auth list
+2. gcloud config list project
+3.export REGION=REGION
+4. export ZONE=Zone
+5. sudo apt get-update (update OS, not a gcloud command)
+6. sudo apt-get install -y nginx (not a gcloud command)
+7. ps auwx | grep nginx (confirm nginx is running)
+8. gcloud compute instances create gcelab2 --machine-type e2-medium --zone=$ZONE (Create a new VM instance using gcloud)
+9. gcloud compute instances create --help (to see all the defaults)
+10. gcloud config set compute/zone ... (set the default region and zones that gcloud uses if you are always working within one region/zone
+ and you don't want to append the --zone flag every time.)
+11. gcloud config set compute/region ...
+12. gcloud config set project [PROJECT_ID] (to switch to a different project)
+13. gcloud config set account [ACCOUNT] to set active account 
+14. gcloud compute ssh gcelab2 --zone=$ZONE (TO CONNECT TO VM instance SSH VIA GCLOUD) => click exit to exit from shell
+
+15. gcloud config get-value compute/region (to view project region setting)
+
+16. gcloud config get-value compute/zone (to view project zone setting)
+
+17. gcloud config get-value project
+
+18. gcloud compute project-info describe --project $(gcloud config get-value project)
+
+19. google-compute-default-region and google-compute-default-zone (default region and zone for a project)
+
+20. echo -e "PROJECT ID: $PROJECT_ID\nZONE: $ZONE" (output command)
+
+21. gcloud components list, gcloud config list --all, gcloud config --help, gcloud help config
+
+22. gcloud compute instances list
+
+23. gcloud compute instances list --filter="name=('gcelab2')" 
+
+------------------------------------CONFIGURE FIREWALL RULES--------------------------
+
+24. gcloud compute firewall-rules list
+
+25. gcloud compute firewall-rules list --filter="network='default'"
+
+26. wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy && chmod +x cloud_sql_proxy
+
+----------------------------------
+
+The sudo ifconfig command lists a Linux VM's network interfaces along with the internal IP addresses for each interface.
+
+
+--------------------SSH commands-------------
+
+sudo apt-get install nginx-light -y
+sudo nano /var/www/html/index.nginx-debian.html
+cat /var/www/html/index.nginx-debian.html
+
+
+
+=> gcloud compute start-iap-tunnel windows-iap 3389 --local-host-port=localhost:0  --zone=us-east1-d
+26. gcloud compute firewall-rules list --filter="NETWORK:'default' AND ALLOW:'icmp'"
+
+27. gcloud compute instances add-tags gcelab2 --tags http-server,https-server
+
+28. gcloud compute firewall-rules create default-allow-http --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:80 --source-ranges=0.0.0.0/0 --target-tags=http-server
+
+29. gcloud compute firewall-rules list --filter=ALLOW:'80'
+
+30. curl http://$(gcloud compute instances list --filter=name:gcelab2 --format='value(EXTERNAL_IP)')  => verify if communication is possible for server
+
+--------------------------------LOGS--------------------------------
+
+31. gcloud logging logs list
+
+32. gcloud logging logs list --filter="compute"
+
+33. gcloud logging read "resource.type=gce_instance" --limit 5
+
+34. gcloud logging read "resource.type=gce_instance AND labels.instance_name='gcelab2'" --limit 5
+
+
+---------------------------LOAD BALANCERS-----------------------------------
+
+1. Setting the tags field lets you reference these instances all at once, such as with a firewall rule.
+
+  gcloud compute instances create www1 \
+    --zone=us-east1-d \
+    --tags=network-lb-tag \
+    --machine-type=e2-small \
+    --image-family=debian-11 \
+    --image-project=debian-cloud \
+    --metadata=startup-script='#!/bin/bash
+      apt-get update
+      apt-get install apache2 -y
+      service apache2 restart
+      echo "
+<h3>Web Server: www1</h3>" | tee /var/www/html/index.html'
+
+2. gcloud compute firewall-rules create www-firewall-network-lb \
+    --target-tags network-lb-tag --allow tcp:80
+
+3. curl http://{EXTERNAL_IP} to check if server is running accessible
+
+
+---------------------CONFIGURING LOAD BALANCER SERVICE-------------------------------
+
+1. gcloud compute addresses create network-lb-ip-1 \
+  --region us-east1
+
+2. gcloud compute http-health-checks create basic-check
+
+3. gcloud compute target-pools create www-pool \
+  --region us-east1 --http-health-check basic-check
+
+Add a target pool in the same region as your instances. Run the following to create the target pool and use the health check, which is required for the service to function
+
+4. Add instances to target pool
+
+gcloud compute target-pools add-instances www-pool \
+    --instances www1,www2,www3
+
+5. Add forwarding rule
+
+gcloud compute forwarding-rules create www-rule \
+    --region  us-east1 \
+    --ports 80 \
+    --address network-lb-ip-1 \
+    --target-pool www-pool
+
+=> you've created an L4 network load balancer that points to the web servers.
+
+6. view the external IP address of the www-rule forwarding rule used by the load balancer
+
+gcloud compute forwarding-rules describe www-rule --region us-east1
+
+7. Access external IP address
+
+IPADDRESS=$(gcloud compute forwarding-rules describe www-rule --region us-east1 --format="json" | jq -r .IPAddress)
+
+8. The response from the curl command alternates randomly among the three instances.
+
+while true; do curl -m1 $IPADDRESS; done
+
+
+
+-------------------------------CREATING AN HTTP LOAD BALANCER-------------------------------------------
+
+1. gcloud compute instance-templates create lb-backend-template \
+   --region=us-east1 \
+   --network=default \
+   --subnet=default \
+   --tags=allow-health-check \
+   --machine-type=e2-medium \
+   --image-family=debian-11 \
+   --image-project=debian-cloud \
+   --metadata=startup-script='#!/bin/bash
+     apt-get update
+     apt-get install apache2 -y
+     a2ensite default-ssl
+     a2enmod ssl
+     vm_hostname="$(curl -H "Metadata-Flavor:Google" \
+     http://169.254.169.254/computeMetadata/v1/instance/name)"
+     echo "Page served from: $vm_hostname" | \
+     tee /var/www/html/index.html
+     systemctl restart apache2'
+
+2. create a managed instance group based on load balancer template
+
+gcloud compute instance-groups managed create lb-backend-group \
+   --template=lb-backend-template --size=2 --zone=us-east1-d
+
+3. create firewall rule
+
+gcloud compute firewall-rules create fw-allow-health-check \
+  --network=default \
+  --action=allow \
+  --direction=ingress \
+  --source-ranges=130.211.0.0/22,35.191.0.0/16 \
+  --target-tags=allow-health-check \
+  --rules=tcp:80
+
+4. set up a global static external IP address that your customers use to reach your load balancer
+
+gcloud compute addresses create lb-ipv4-1 \
+  --ip-version=IPV4 \
+  --global
+
+5. create a health check for load balancer
+
+gcloud compute health-checks create http http-basic-check \
+  --port 80
+
+6. create a backend service
+
+gcloud compute backend-services create web-backend-service \
+  --protocol=HTTP \
+  --port-name=http \
+  --health-checks=http-basic-check \
+  --global
+
+7. Add your instance group as the backend to the backend service
+
+gcloud compute backend-services add-backend web-backend-service \
+  --instance-group=lb-backend-group \
+  --instance-group-zone=us-east1-d \
+  --global
+
+8. create a url-map to route incoming request to default backend service
+
+gcloud compute url-maps create web-map-http \
+    --default-service web-backend-service
+
+9. Create a target HTTP proxy to route requests to your URL map
+
+ gcloud compute target-http-proxies create http-lb-proxy \
+
+10. create a forwarding-rule to route incoming requests to proxy
+
+gcloud compute forwarding-rules create http-content-rule \
+   --address=lb-ipv4-1\
+   --global \
+   --target-http-proxy=http-lb-proxy \
+   --ports=80
+    --url-map web-map-http
+
+Flow => Forwarding rule => Proxy => URL-map => default backend service (instance group created based on instance template)
+
+
+
+
+-------------------------------WEEK 2 COMMANDS-------------------------------------------------
+
+1. gcloud storage buckets create gs://[BUCKET_NAME]
+
+2. gcloud storage cp [MY_FILE] gs://[BUCKET_NAME] (copy uploaded file to storage bucket)
+
+3. source infraclass/config
+echo $INFRACLASS_PROJECT_ID
+
+This gives you a method to create environment variables and to easily recreate them if the Cloud Shell is recycled or reset. However, you will still need to remember to issue the 
+source command each time Cloud Shell is opened. In the next step, you modify the .profile file so that the source command is issued automatically every time a terminal to Cloud Shell
+ is opened.
+
+nano .profile
+append this to EOF - source infraclass/config
+
+NOTE - To create a persistent state in Cloud Shell, which file would you configure? => .profile
+
+
+4. sudo /opt/bitnami/ctlscript.sh stop (stop all the services running on the VM)
+
+
+sudo /opt/bitnami/ctlscript.sh restart (restart the services)
+
+
+=> Networking 
+
+1. ping -c 3 [internal ip address] (access due to allow custom firewall rule)
+1. ping -c 3 [external ip address] (access due to allow icmp firewall rule)
+
+
+5. gcloud compute networks create privatenet --subnet-mode=custom
+
+6. gcloud compute networks subnets create privatesubnet-us --network=privatenet --region=us-east4 --range=172.16.0.0/24
+
+7. gcloud compute networks list
+
+8. gcloud compute networks subnets list --sort-by=NETWORK
+
+9. gcloud compute firewall-rules create privatenet-allow-icmp-ssh-rdp --direction=INGRESS --priority=1000 --network=privatenet --action=ALLOW --rules=icmp,tcp:22,tcp:3389 --source-ranges=0.0.0.0/0
+
+10. gcloud compute firewall-rules list --sort-by=NETWORK
+
+11. gcloud compute instances create privatenet-us-vm --zone=us-east4-a --machine-type=e2-micro --subnet=privatesubnet-us --image-family=debian-11 --image-project=debian-cloud --boot-disk-size=10GB --boot-disk-type=pd-standard --boot-disk-device-name=privatenet-us-vm
+
+12. gcloud compute instances list --sort-by=ZONE
+
+13. gcloud compute ssh vm-internal --zone us-east4-c --tunnel-through-iap (connect to vm instance via IAP tunnel)
+
+14. gcloud storage cp gs://cloud-training/gcpnet/private/access.svg gs://$MY_BUCKET (copy an image from public storage bucket to private bucket)
+
+15. Few linux commands (SSH) - nproc (check the processor info), lscpu (check cpu info), free (check memory distribution) for custom VMs
+
+
+=> Configuring VM and server
+
+1. sudo mkdir -p /home/minecraft (The disk is attached to the instance, but it is not yet mounted or formatted => To create a directory that serves as the mount point for the data disk)
+
+2. sudo mkfs.ext4 -F -E lazy_itable_init=0,\
+lazy_journal_init=0,discard \
+/dev/disk/by-id/google-minecraft-disk  (for disk formatting)
+
+3. DIsk mounting - sudo mount -o discard,defaults /dev/disk/by-id/google-minecraft-disk /home/minecraft
+
+4. Initialize the minecraft server - sudo java -Xmx1024M -Xms1024M -jar server.jar nogui
+
+5. sudo ls -l => sudo nano eula.txt (file edit)
+
+6. sudo screen -S mcs java -Xmx1024M -Xms1024M -jar server.jar nogui (start minecraft server in screen virtual terminal) => Ctrl A, Ctrl D to detach => sudo screen -r mcs (to reattach)
+
+
+7. #!/bin/bash
+screen -r mcs -X stuff '/save-all\n/save-off\n'
+/usr/bin/gcloud storage cp -R ${BASH_SOURCE%/*}/world gs://${YOUR_BUCKET_NAME}-minecraft-backup/$(date "+%Y%m%d-%H%M%S")-world
+screen -r mcs -X stuff '/save-on\n'
+
+(backup script) -Note: The script saves the current state of the server's world data and pauses the server's auto-save functionality. Next, it backs up the server's world data directory (world) and places its contents in a timestamped directory (<timestamp>-world) in the Cloud Storage bucket. 
+After the script finishes backing up the data, it resumes auto-saving on the Minecraft server.
+
+
+8. to make the script executable - sudo chmod 755 /home/minecraft/backup.sh
+
+9. Run the backup script - . /home/minecraft/backup.sh
+
+Click on the backup bucket name. You should see a folder with a date-time stamp name. 
+Now that you've verified that the backups are working, you can schedule a cron job to automate the task.
+
+10. SCheduling cron job - 
+
+ => sudo crontab -e (open cron table), choose nano and then add this line to run cron job every 4 hrs => 0 */4 * * * /home/minecraft/backup.sh
+
+NOTE - Note: This creates about 300 backups a month in Cloud Storage, so you will want to regularly delete them to avoid charges. Cloud Storage offers the Object Lifecycle Management feature to set a Time to Live (TTL) for objects, archive older versions of objects,
+ or "downgrade" storage classes of objects to help manage costs.
+
+
+
+SERVER MAINTENANCE
+
+1.sudo screen -r -X stuff '/stop\n' (stop the server)
+
+Note: To start up your instance again, visit the instance page and then click Start. To start the Minecraft server again, you can establish an SSH connection with the instance, remount your persistent disk, 
+and start your Minecraft server in a new screen terminal, just as you did previously.
+
+Note: You'll have to click Add item (Vm instance -> edit -> add metadata) to add the shutdown-script-url & startup-script-url. When you restart your instance, the startup script automatically mounts the Minecraft disk to the appropriate directory, starts your Minecraft server in a screen session, and detaches the session. 
+When you stop the instance, the shutdown script shuts down your Minecraft server before the instance shuts down. It's a best practice to store these scripts in Cloud Storage.
+
+
+
+---------------------------------CLOUD STORAGE USING gsutil--------------------------------------
+
+1. gsutil mb gs://<YOUR-BUCKET-NAME> (mb = make bucket) 
+
+2. curl https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Ada_Lovelace_portrait.jpg/800px-Ada_Lovelace_portrait.jpg --output ada.jpg  (curl command to download the image)
+
+3. remove the image from bucket - rm ada.jpg
+
+4. gsutil cp -r gs://YOUR-BUCKET-NAME/ada.jpg . (download image from bucket to shell)
+
+4. create a folder and copy the image from bucket to folder.
+
+gsutil cp gs://YOUR-BUCKET-NAME/ada.jpg gs://YOUR-BUCKET-NAME/image-folder/
+
+5. list contents of a bucket => gsutil ls gs://qwiklabs-gcp-04-29366799e6c1_bucket-1
+
+6. list details => gsutil ls -l gs://YOUR-BUCKET-NAME/ada.jpg
+
+7. gsutil acl ch -u AllUsers:R gs://YOUR-BUCKET-NAME/ada.jpg
+
+Use the gsutil acl ch command to grant all users read permission for the object stored in your bucket
+
+8. Remove public access - gsutil acl ch -d AllUsers gs://YOUR-BUCKET-NAME/ada.jpg
+
+9. delete object - gsutil rm gs://YOUR-BUCKET-NAME/ada.jpg
+
+
+
+----------------------------Cloud Monitoring------------------
+
+- sudo service apache2 restart
+
+Install cloud monitoring agent via ssh terminal
+
+1. curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+
+2. sudo bash add-google-cloud-ops-agent-repo.sh --also-install
+
+3. sudo systemctl status google-cloud-ops-agent"*" (logging agent installation script)
+
+
+--------------Cloud functions--------------------
+
+=> gcloud services disable cloudfunctions.googleapis.com
+
+=> gcloud projects add-iam-policy-binding [PROJECT_ID] \
+--member="serviceAccount:[PROJECT_ID]@appspot.gserviceaccount.com" \
+--role="roles/artifactregistry.reader"
+
+=> gcloud functions deploy helloWorld \
+  --stage-bucket [BUCKET_NAME] \
+  --trigger-topic hello_world \
+  --runtime nodejs20
+
+=> gcloud functions describe helloWorld (verify the status of cloud funtion)
+
+=> gcloud functions logs read helloWorld
+
+=> gcloud pubsub subscriptions pull --auto-ack MySub (pull messages using MySub subscription from the topic)
+
+=> gcloud pubsub topics create myTopic 
+
+=> gcloud pubsub topics list
+
+=> gcloud pubsub topics delete Test1
+
+=> gcloud  pubsub subscriptions create --topic myTopic mySubscription
+
+=> gcloud pubsub topics list-subscriptions myTopic
+
+=> gcloud pubsub subscriptions delete Test1
+
+=> gcloud pubsub topics publish myTopic --message "Hello"
+
+=> gcloud pubsub subscriptions pull mySubscription --auto-ack
+
+Using the pull command without any flags will output only one message, even if you are subscribed to a topic that has more held in it.
+Once an individual message has been outputted from a particular subscription-based pull command, you cannot access that message again with the pull command.
+
+=> gcloud pubsub subscriptions pull mySubscription --auto-ack --limit=3 (limit flag decides the number of messages to be pulled at one go)
+
+
+in SSH, rename the file - mv sample.txt sample2.txt
+
+
+=> curl command to download a sample html file 
+curl \
+https://hadoop.apache.org/docs/current/\
+hadoop-project-dist/hadoop-common/\
+ClusterSetup.html > setup.html
+
+=> make 2 copies
+cp setup.html setup2.html
+cp setup.html setup3.html
+
+=> Get default ACL on setup.html 
+gsutil acl get gs://$BUCKET_NAME_1/setup.html  > acl.txt
+cat acl.txt
+
+=> Set ACL to private
+gsutil acl set private gs://$BUCKET_NAME_1/setup.html
+gsutil acl get gs://$BUCKET_NAME_1/setup.html  > acl2.txt
+cat acl2.txt
+
+=> update acl to make file publicly readable
+gsutil acl ch -u AllUsers:R gs://$BUCKET_NAME_1/setup.html
+gsutil acl get gs://$BUCKET_NAME_1/setup.html  > acl3.txt
+cat acl3.txt
+
+=> gsutil config -n to create a boto file for csek encryption key updates.
+
+=> gsutil cp gs://$BUCKET_NAME_1/setup* ./ (copy all files starting with setup from bucket to shell)
+
+=> python3 -c 'import base64; import os; print(base64.encodebytes(os.urandom(32)))' (generate a random 256-bit encrypted CSEK key)
+
+=> When a file is encrypted, rewriting the file decrypts it using the decryption_key1 that you previously set, and encrypts the file with the new encryption_key.
+
+=> gsutil rewrite -k gs://$BUCKET_NAME_1/setup2.html (essential for key rotation) 
+ 
+=> gsutil cp gs://$BUCKET_NAME_1/setup3.html recover3.html (download the file)
+setup3.html was not rewritten with the new key, so it can no longer be decrypted, and the copy will fail.
+You have successfully rotated the CSEK keys.
+
+=> gsutil lifecycle get gs://$BUCKET_NAME_1 (view current lifecycle policy)
+
+=> Create a lifecycle config for bucket
+nano life.json
+{
+  "rule":
+  [
+    {
+      "action": {"type": "Delete"},
+      "condition": {"age": 31}
+    }
+  ]
+}
+
+=> set lifecycle policy - gsutil lifecycle set life.json gs://$BUCKET_NAME_1
+
+=> get lifecycle policy - gsutil lifecycle get gs://$BUCKET_NAME_1
+
+=> gsutil versioning get gs://$BUCKET_NAME_1
+
+=> gsutil versioning set on gs://$BUCKET_NAME_1 (enable versioning)
+
+gcloud storage cp -v setup.html gs://$BUCKET_NAME_1 (note the -v flag for versioning)
+
+=> gcloud storage ls -a gs://$BUCKET_NAME_1/setup.html (list all the versions)
+
+=> gcloud storage cp $VERSION_NAME recovered.txt
+
+=> gsutil rsync -r ./firstlevel gs://$BUCKET_NAME_1/firstlevel (sync local directory with bucket)
+
+=> gcloud storage ls -r gs://$BUCKET_NAME_1/firstlevel
+
+---------------------------------------------
+
+
+=> From the bastion host VM, connect to the main VM through it's internal IP address by using the --internal-ip flag
+
+gcloud compute ssh juice-shop --internal-ip
+
+
+------------------------------------VPN GATEWAYS--------------------------
+
+gcloud compute vpn-gateways create vpc-demo-vpn-gw1 --network vpc-demo --region us-east4
+
+gcloud compute vpn-gateways describe vpc-demo-vpn-gw1 --region us-east4
+
+gcloud compute routers create vpc-demo-router1 \
+    --region us-east4 \
+    --network vpc-demo \
+    --asn 65001
+
+To create/configure a cloud router
+
+=> To create VPN tunnels (2 tunnels for 2 interfaces - one for each interface)
+
+gcloud compute vpn-tunnels create vpc-demo-tunnel0 \
+    --peer-gcp-gateway on-prem-vpn-gw1 \
+    --region us-east4 \
+    --ike-version 2 \
+    --shared-secret [SHARED_SECRET] \
+    --router vpc-demo-router1 \
+    --vpn-gateway vpc-demo-vpn-gw1 \
+    --interface 0
+
+=> To create BGP peering
+
+gcloud compute routers add-bgp-peer vpc-demo-router1 \
+    --peer-name bgp-on-prem-tunnel0 \
+    --interface if-tunnel0-to-on-prem \
+    --peer-ip-address 169.254.0.2 \
+    --peer-asn 65002 \
+    --region us-east4
+
+NOTE - Add router interface and BGP peer for both the interfaces in both the networks
+
+=> gcloud compute routers describe vpc-demo-router1 \
+    --region us-east4
+
+=> allow traffic from on-prem network to VPC network
+
+gcloud compute firewall-rules create vpc-demo-allow-subnets-from-on-prem \
+    --network vpc-demo \
+    --allow tcp,udp,icmp \
+    --source-ranges 192.168.1.0/24
+
+=> gcloud compute vpn-tunnels list
+
+=> check status of tunnels - gcloud compute vpn-tunnels describe vpc-demo-tunnel0 \
+      --region us-east4
+
+=> gcloud compute networks update vpc-demo --bgp-routing-mode GLOBAL
+
+=> gcloud compute vpn-tunnels delete vpc-demo-tunnel0  --region us-east4
+
+
+------------------------TERRAFORM SAMPLE SCRIPTS--------
+
+# Create the mynetwork network
+resource "google_compute_network" "mynetwork" {
+name = "mynetwork"
+# RESOURCE properties go here
+auto_create_subnetworks = "true"
+}
+
+
+# Add a firewall rule to allow HTTP, SSH, RDP and ICMP traffic on mynetwork
+resource "google_compute_firewall" "mynetwork-allow-http-ssh-rdp-icmp" {
+name = "mynetwork-allow-http-ssh-rdp-icmp"
+# RESOURCE properties go here
+network = google_compute_network.mynetwork.self_link
+allow {
+    protocol = "tcp"
+    ports    = ["22", "80", "3389"]
+    }
+allow {
+    protocol = "icmp"
+    }
+source_ranges = ["0.0.0.0/0"]
+}
+
+NOTE - Because this firewall rule depends on its network, you are using the google_compute_network.mynetwork.self_link reference to instruct Terraform to resolve these resources
+ in a dependent order. In this case, the network is created before the firewall rule.
+
+
+
+
+resource "google_compute_instance" "vm_instance" {
+  name         = "${var.instance_name}"
+  zone         = "${var.instance_zone}"
+  machine_type = "${var.instance_type}"
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-11"
+      }
+  }
+  network_interface {
+    network = "${var.instance_network}"
+    access_config {
+      # Allocate a one-to-one NAT IP to the instance
+    }
+  }
+}
+
+
+NOTE - Leaving the access configuration empty results in an ephemeral external IP address (required in this lab). To create instances with only an internal IP address, remove the 
+access_config section.
+
+
+variable "instance_name" {}
+variable "instance_zone" {}
+variable "instance_type" {
+  default = "e2-micro"
+  }
+variable "instance_network" {}
+
+
+
+In mynetwork.tf =>
+
+
+# Create the mynet-us-vm instance
+module "mynet-us-vm" {
+  source           = "./instance"
+  instance_name    = "mynet-us-vm"
+  instance_zone    = "us-east4-a"
+  instance_network = google_compute_network.mynetwork.self_link
+}
+
+# Create the mynet-eu-vm" instance
+module "mynet-eu-vm" {
+  source           = "./instance"
+  instance_name    = "mynet-eu-vm"
+  instance_zone    = "europe-west4-b"
+  instance_network = google_compute_network.mynetwork.self_link
+}
+
+NOTE - These resources are leveraging the module in the instance folder and provide the name, zone, and network as inputs. Because these instances depend on a VPC network, you are using 
+the google_compute_network.mynetwork.self_link reference to instruct Terraform to resolve these resources in a dependent order. In this case, the network is created before the instance.
+
+Note: The benefit of writing a Terraform module is that it can be reused across many configurations.
+
+
+=> terraform fm (format) and terraform plan => terraform apply to execute the terraform scripts
+
+
+------------------------------------------------
+
+sudo google_metadata_script_runner startup (rerun instance startup scripts)
+
+----------
+
+place a load on load balancer
+ab -n 500000 -c 1000 http://$LB_IP/
+
+
+
+NOTE - learn more about VPC network peering (use this to establish network connectivity and enable resource sharing b/w different projects of an org)
+
+=> gcloud iam list-testable-permissions //cloudresourcemanager.googleapis.com/projects/$DEVSHELL_PROJECT_ID (list all the available permissions for the project)
+
+=> gcloud iam roles describe [ROLE_NAME]
+
+=> gcloud iam list-grantable-roles //cloudresourcemanager.googleapis.com/projects/$DEVSHELL_PROJECT_ID
+
+=> gcloud iam roles create editor --project $DEVSHELL_PROJECT_ID \
+--file role-definition.yaml
+
+NOTE - CUSTOM roles could be created using yaml file config or via using flags in the gcloud command.
+
+=> gcloud iam roles create viewer --project $DEVSHELL_PROJECT_ID \
+--title "Role Viewer" --description "Custom role description." \
+--permissions compute.instances.get,compute.instances.list --stage ALPHA
+
+=> List all the predefined roles - gcloud iam roles list
+
+=> gcloud iam roles describe [ROLE_ID] --project $DEVSHELL_PROJECT_ID (returns current metadata of the role along with unique etag value)
+
+=> COPY the output from above command -> save it in a new yaml config file -> gcloud iam roles update [ROLE_ID] --project $DEVSHELL_PROJECT_ID \
+--file new-role-definition.yaml
+
+
+=> Update the permissions of a custom role via flags - 
+gcloud iam roles update viewer --project $DEVSHELL_PROJECT_ID \
+--add-permissions storage.buckets.get,storage.buckets.list
+
+
+=> Disable the role
+gcloud iam roles update viewer --project $DEVSHELL_PROJECT_ID \
+--stage DISABLED
+
+=> Delete the role
+gcloud iam roles delete viewer --project $DEVSHELL_PROJECT_ID
+
+=> Restore the role
+gcloud iam roles undelete viewer --project $DEVSHELL_PROJECT_ID
+
+=> Create service account
+gcloud iam service-accounts create my-sa-123 --display-name "my service account"
+
+=> Grant IAM role to service account
+gcloud projects add-iam-policy-binding $DEVSHELL_PROJECT_ID \
+    --member serviceAccount:my-sa-123@$DEVSHELL_PROJECT_ID.iam.gserviceaccount.com --role roles/editor
+
+
+=> gcloud app browse (browse application deployed on app engine)
+=> gcloud app deploy (deploy application on app engine)
+
+
+=> gcloud services enable cloudkms.googleapis.com (enable Cloud KMS)
+
+=> gcloud kms keyrings create $KEYRING_NAME --location global (create keyring)
+
+=> gcloud kms keys create $CRYPTOKEY_NAME --location global \
+      --keyring $KEYRING_NAME \
+      --purpose encryption
+
+=> gcloud kms keyrings add-iam-policy-binding $KEYRING_NAME \
+    --location global \
+    --member user:$USER_EMAIL \
+    --role roles/cloudkms.admin
+
+=> CopY all files - gsutil -m cp -r gs://enron_emails/allen-p .
+
+
+NOTE - SAMPLE SCRIPT FOR encrypting the files
+
+MYDIR=allen-p
+FILES=$(find $MYDIR -type f -not -name "*.encrypted")
+for file in $FILES; do
+  PLAINTEXT=$(cat $file | base64 -w0)
+  curl -v "https://cloudkms.googleapis.com/v1/projects/$DEVSHELL_PROJECT_ID/locations/global/keyRings/$KEYRING_NAME/cryptoKeys/$CRYPTOKEY_NAME:encrypt" \
+    -d "{\"plaintext\":\"$PLAINTEXT\"}" \
+    -H "Authorization:Bearer $(gcloud auth application-default print-access-token)" \
+    -H "Content-Type:application/json" \
+  | jq .ciphertext -r > $file.encrypted
+done
+gsutil -m cp allen-p/inbox/*.encrypted gs://${BUCKET_NAME}/allen-p/inbox
+
+This script loops over all the files in a given directory, encrypts them using the KMS API, and uploads them to Cloud Storage.
+
+
+----
+
+=> gcloud beta container clusters create private-cluster \
+    --enable-private-nodes \
+    --master-ipv4-cidr 172.16.0.16/28 \
+    --enable-ip-alias \
+    --create-subnetwork ""
+
+to create private clusters
+
+=> gcloud compute networks subnets list --network default (to check the default subnet created for the kubernetes cluster)
+
+=> gcloud compute networks subnets describe [SUBNET_NAME] --region=$REGION
+
+=> gcloud compute instances create source-instance --zone=$ZONE --scopes 'https://www.googleapis.com/auth/cloud-platform' (instance to check connectivity to kubernetes clusters)
+
+=> Get NAT external IP - gcloud compute instances describe source-instance --zone=$ZONE | grep natIP
+
+=> gcloud container clusters update private-cluster \
+    --enable-master-authorized-networks \
+    --master-authorized-networks [MY_EXTERNAL_RANGE]
+
+Authorize your external address range for private cluster in automatic subnetwork
+
+=> Configure access to the Kubernetes cluster from SSH shell with:
+sudo apt-get install google-cloud-sdk-gke-gcloud-auth-plugin
+gcloud container clusters get-credentials private-cluster --zone=$ZONE
+
+=> kubectl get nodes --output yaml | grep -A4 addresses (Verify that your cluster nodes do not have external IP addresses)
+
+=> kubectl get nodes --output wide (Verify that your cluster nodes do not have external IP addresses)
+
+=> gcloud container clusters delete private-cluster --zone=$ZONE
+
+NOTE - create your own custom subnetwork, and then create a private cluster. Your subnetwork has a primary address range and two secondary address ranges.
+
+=> gcloud compute networks subnets create my-subnet \
+    --network default \
+    --range 10.0.4.0/22 \
+    --enable-private-ip-google-access \
+    --region=$REGION \
+    --secondary-range my-svc-range=10.0.32.0/20,my-pod-range=10.4.0.0/14
+
+=> Create a private cluster that uses your subnetwork:
+gcloud beta container clusters create private-cluster2 \
+    --enable-private-nodes \
+    --enable-ip-alias \
+    --master-ipv4-cidr 172.16.0.32/28 \
+    --subnetwork my-subnet \
+    --services-secondary-range-name my-svc-range \
+    --cluster-secondary-range-name my-pod-range \
+    --zone=$ZONE
+
+=> gcloud container clusters update private-cluster2 \
+    --enable-master-authorized-networks \
+    --zone=$ZONE \
+
+
+NOTE - At this point, the only IP addresses that have access to the master are the addresses in these ranges:
+
+The primary range of your subnetwork. This is the range used for nodes. In this example, the range for nodes is 10.0.4.0/22.
+The secondary range of your subnetwork that is used for pods. In this example, the range for pods is 10.4.0.0/14.
+    --master-authorized-networks [MY_EXTERNAL_RANGE]
+
+Authorize your external address range for private cluster in custom subnetwork
+
+
+
+--------------Terraform Commands----------
+
+terraform init, terraform plan, terraform apply, terraform destroy, terraform apply "static_ip", terraform taint google_compute_instance.vm_instance
+
+Create new module 
+
+cd ~
+touch main.tf
+mkdir -p modules/gcs-static-website-bucket
+
+Return to the main.tf in your root directory and add a reference to the new module:
+
+
+module "gcs-static-website-bucket" {
+  source = "./modules/gcs-static-website-bucket"
+
+  name       = var.name
+  project_id = var.project_id
+  location   = "us-east1"
+
+  lifecycle_rules = [{
+    action = {
+      type = "Delete"
+    }
+    condition = {
+      age        = 365
+      with_state = "ANY"
+    }
+  }]
+}
+
+In your root directory, create an outputs.tf file for your root module:
+cd ~
+touch outputs.tf
+
+Add the following code in the outputs.tf file:
+output "bucket-name" {
+  description = "Bucket names."
+  value       = "module.gcs-static-website-bucket.bucket"
+
+Add the following code to variables.tf file in the root directory
+
+variable "project_id" {
+  description = "The ID of the project in which to provision resources."
+  type        = string
+  default     = "qwiklabs-gcp-03-53e5a195c81c"
+}
+
+variable "name" {
+  description = "Name of the buckets to create."
+  type        = string
+  default     = "qwiklabs-gcp-03-53e5a195c81c-bucket-1"
+}
+
+=> copy to the bucket
+
+gsutil cp *.html gs://YOUR-BUCKET-NAME
+
+=> Add a local backend to your main.tf file:
+terraform {
+  backend "local" {
+    path = "terraform/state/terraform.tfstate"
+  }
+}
+This will reference a terraform.tfstate file in the terraform/state directory. To specify a different file path, change the path variable.
+}
+
+=> Add a GCS backend
+
+terraform {
+  backend "gcs" {
+    bucket  = "qwiklabs-gcp-01-3ded35b81394"
+    prefix  = "terraform/state"
+  }
+}
+
+=> Initialize your backend again, this time to automatically migrate the state - 
+
+terraform init -migrate-state
+
+Click on your bucket and navigate to the file terraform/state/default.tfstate. Your state file now exists in a Cloud Storage bucket!
+
+=> terraform refresh (updates the state file)
+
+
+=> Under the commented-out code, define an empty docker_container resource in your docker.tf file, which represents a Docker container with the Terraform resource ID
+ docker_container.web:
+
+resource "docker_container" "web" {}
+
+=> Run the following terraform import command to attach the existing Docker container to the docker_container.web resource you just created. Terraform import requires this 
+Terraform resource ID and the full Docker container ID. The command docker inspect -f {{.ID}} hashicorp-learn returns the full SHA256 container ID:
+
+terraform import docker_container.web $(docker inspect -f {{.ID}} hashicorp-learn)
+
+This state contains everything that Terraform knows about the Docker container you just imported. However, Terraform import does not create the configuration for the resource.
+You’ll need to create Terraform configuration before you can use Terraform to manage this container.
+
+=> terraform import 
+terraform import module.tf_instance_1.google_compute_instance.instance \
+  projects/$prj/zones/$zone/instances/tf-instance-1
+
+OR
+
+terraform import module.tf_instance_1.google_compute_instance.instance [Instance_ID] (click on the instance to get instance id)
+
+=> Copy your Terraform state into your docker.tf file:
+terraform show -no-color > docker.tf
+
+Note: The > symbol will replace the entire contents of docker.tf with the output of the terraform show command. Although this works for this example, importing a resource into a 
+configuration that already manages resources will require you to edit the output of terraform show to remove existing resources whose configuration you do not want to replace completely
+ and merge the new resources into your existing configuration.
+
+
+=> These read-only argument (errors when you run terraform plan) are values that Terraform stores in its state for Docker containers but that it cannot set via configuration because they
+ are managed internally by Docker. So, these attributes can be safely removed from the configuration.
+
+
+=> Terraform uses these attributes to create Docker containers, but Docker doesn’t store them. As a result, terraform import didn’t load their values into state. When you plan and apply 
+your configuration, the Docker provider will assign the default values for these attributes and save them in state, but they won’t affect the running container.
+
+Apply the changes and finish the process of syncing your updated Terraform configuration and state with the Docker container they represent. Type yes at the prompt to confirm.
+terraform apply
+
+=> resource "docker_image" "nginx" {
+  name         = "nginx:latest"
+}
+
+
+# docker_container.web:
+resource "docker_container" "web" {
+    image             = "docker_image.nginx.image_id"
+    name              = "hashicorp-learn"
+    ports {
+        external = 8080
+        internal = 80
+        ip       = "0.0.0.0"
+        protocol = "tcp"
+    }
+}
+
+resource "docker_image" "nginx" {
+  name         = "nginx:latest"
+}
+
+
+
+
+=> add firewall
+
+resource "google_compute_firewall" "default" {
+  name          = "tf-firewall"
+  network       = module.network.network_name
+  direction     = "INGRESS"
+  source_ranges = ["0.0.0.0/0"]
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80"]
+  }
+}
