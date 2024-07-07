@@ -1,0 +1,160 @@
+Cloud functions and Cloud run - Serverless computing
+IaaS - Compute Engine (Pay beforehand)
+PaaS - App engine (Pay for what you use)
+
+Budgets, Alerts, Reports and Quotas
+
+Quotas - Rate (reset after a period) & Allocation
+
+Resources belong to a single project
+
+Project ID - Immutable, global unique ID created by google (but can be changes by user during creation)
+
+IAM - allow policies and deny policies
+
+Basic roles - Owner, Viewer, Editor and Billing Admin
+
+Custom roles can only be applied at organization level OR project level
+
+Service accounts - purpose is to grant permissions to a VM (not an actual user) => uses email and crytographic keys to access resources
+
+Service account is both - Identity as well as a resource (which could have its own IAM policies)
+
+Cloud Identity tool
+
+SAMPLE SCRIPT = sudo sh -c 'echo "<?php phpinfo(); ?>" > apache2/htdocs/phpinfo.php'
+
+exit - logout from ssh terminal
+
+
+------------------ VPC--------------
+
+VPC subnets can be created in multiple regions spanning across different zones
+
+Autoscaling - resilient and scalable apps
+
+Max number of CPUs per VM - based on machine type & quota constaint depending on the zone
+
+VPC routing tables - forward traffic without any external IP address (firewall rules can be configured)
+
+VPC peering - establish connection b/w 2 different VPC networks in 2 projects
+
+Shared VPC - centralized resource management
+
+Load balancer doesn't operate on VMs
+
+Different types of load balancers - 
+
+1. GLobal HTTPS load balancer - for cross region
+2. GLobal SSL proxy - for SSL traffic that is not HTTP
+3. Global TCP proxy - other TCP traffic that doesn't use SSL
+4. Regional External - UDP traffic or traffic on any port number
+5. Regional Internal - balance traffic in internal communication b/w different layers
+6. Cross Region Internal - load balance traffic to backend services distributed globally -> ensures that traffic is directed to closest 
+backend service.
+
+
+READ ABOUT DIFFERENT INTERCONNECT OPTIONS
+
+----------------------Storage Options ---------------
+
+~Cloud Storage 
+
+- Access Control List (Scope + Permission)
+- Versioning (disabled by default) -> if enabled -> cloud storage bucket will contain all the versions of an object 
+- Immutable i.e new version always overrides the old version
+
+Classes - 
+
+1. Standard - frequent access
+2. Nearline - once a month (data backups, archive)
+3. Coldline - once 3 months 
+4. Archive - access less than once a year (cheap)
+
+Data transfer
+
+1. online transfer (drag & drop, via google cloud sdk)
+2. Storage Transfer service (run batch jobs to transfer huge amounts of data)
+3. Transfer appliance (rackable, high capacity storage server)
+
+~Cloud SQL
+
+- It can be accessed by google's other internal as well as external service
+- Relational DB like MySql, PostGresql, Sql Server
+
+~Cloud Spanner
+
+- Apps that required high I/O operations (tens of thousands) per second
+- horizontal scalability
+- relational db
+- high availability
+- strong global consistency
+
+~Firestore
+
+- NoSql, horizontal scalability
+- charged at the rate of per document read query
+- best for data synchronization
+- works offline on devices, then once online - it syncs the data with local changes.
+- indexing by default (on result sets)
+- unstructured data support
+
+~Bigtable
+
+- working with more than 1TB of structured/semi-structured data.
+- working with nosql data
+- transactions where strong relational semantics are not required
+- Using APIs, data can be read from and written to Cloud Bigtable through a data service
+
+------------------Kubernetes----------------
+
+- Cluster -> Set of Nodes -> containers wrapped by pods
+
+--------------Cloud Run----------------
+
+- container based
+- serverless
+- Source code based
+- charged during startup, handling web requests and at shutdown
+- cost increases with cpu and memory
+- can only pull container images from docker hub and artifact registries
+
+----------Cloud functions----------------
+
+-event based, lightweight, respond to cloud events
+-async
+-HTTP invocation for synchronous execution
+- async execution by events triggered from Pub Sub or cloud storage
+
+
+--------------------------------NOTES-------------------------------------------
+
+- Resources that live in a zone are referred to as zonal resources. Virtual machine Instances and persistent disks live in a zone. 
+  To attach a persistent disk to a virtual machine instance, both resources must be in the same zone.
+  Similarly, if you want to assign a static IP address to an instance, the instance must be in the same region as the static IP.
+
+- When you run gcloud on your own machine, the config settings are persisted across sessions.
+ But in Cloud Shell, you need to set this for every new session or reconnection.
+
+- you will use your $HOME directory, which is used in persistent disk storage to store files across projects and between Cloud Shell sessions.
+ Your $HOME directory is private to you and cannot be accessed by other users.
+
+- In SSH terminal, The reference before the @ indicates the account being used. After the @ sign indicates the host machine being accessed.
+
+- Communication with the virtual machine will fail as it does not have an appropriate firewall rule. The nginx web server is expecting to communicate on tcp:80. To get communication working you need to:
+
+Add a tag to the gcelab2 virtual machine
+Add a firewall rule for http traffic
+
+- When you configure the load balancing service, your virtual machine instances receives packets that are destined for the static external IP address you configure.
+ Instances made with a Compute Engine image are automatically configured to handle this IP address.
+
+- Managed instance groups (MIGs) let you operate apps on multiple identical VMs. You can make your workloads scalable and highly available by taking advantage of automated MIG services,
+ including: autoscaling, autohealing, regional (multiple zone) deployment, and automatic updating.
+
+- URL map is a Google Cloud configuration resource used to route requests to backend services or backend buckets. For example, with an external HTTP(S) load balancer, you can use a single URL map to route requests to different destinations based on the rules configured in the URL map:
+Requests for https://example.com/video go to one backend service.
+Requests for https://example.com/audio go to a different backend service.
+Requests for https://example.com/images go to a Cloud Storage backend bucket.
+
+- A forwarding rule and its corresponding IP address represent the frontend configuration of a Google Cloud load balancer.

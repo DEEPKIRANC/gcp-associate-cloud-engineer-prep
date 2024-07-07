@@ -1,0 +1,374 @@
+--------------------TERRAFORM-------------------
+
+=> Configuration files describe to Terraform the components needed to run a single application or your entire data center. Terraform generates an execution plan describing what it will do to
+reach the desired state, and then executes it to build the described infrastructure. As the configuration changes, Terraform can determine what changed and create incremental execution
+plans that can be applied.
+
+=> The infrastructure Terraform can manage includes both low-level components such as compute instances, storage, and networking, and high-level components such as DNS entries and 
+SaaS features.
+
+=> Resource graph
+Terraform builds a graph of all your resources and parallelizes the creation and modification of any non-dependent resources. Because of this, Terraform builds infrastructure as 
+efficiently as possible, and operators get insight into dependencies in their infrastructure.
+
+=> Change automation
+Complex changesets can be applied to your infrastructure with minimal human interaction. With the previously mentioned execution plan and resource graph, you know exactly what Terraform 
+will change and in what order, which helps you avoid many possible human errors.
+
+NOTE - The terraform init command will automatically download and install any provider binary for the providers to use within the configuration, which in this case is just 
+the Google provider.
+
+Note: The optional -out argument can be used to save the generated plan to a file for later execution with terraform apply (-out argument could be passed with terraform plan command)
+
+=> Terraform has written some data into the terraform.tfstate file. This state file is extremely important: it keeps track of the IDs of created resources so that Terraform 
+knows what it is managing (run terraform show command) => You can see that by creating this resource, you've also gathered a lot of information about it. These values can be referenced
+to configure additional resources or outputs.
+
+=> Terraform block
+
+terraform {
+  required_providers {
+    google = {
+      source = "hashicorp/google"
+      version = "3.5.0"
+    }
+  }
+}
+
+The terraform {} block is required so Terraform knows which provider to download from the Terraform Registry. In the configuration above, the google provider's source is defined as 
+hashicorp/google which is shorthand for registry.terraform.io/hashicorp/google.
+
+You can also assign a version to each provider defined in the required_providers block. The version argument is optional, but recommended. It is used to constrain the provider to a 
+specific version or a range of versions in order to prevent downloading a new provider that may possibly contain breaking changes. If the version isn't specified, Terraform will 
+automatically download the most recent provider during initialization.
+
+=> Providers
+
+provider "google" {
+
+  project = "qwiklabs-gcp-01-27f8816bd503"
+  region  = "us-east1"
+  zone    = "us-east1-b"
+}
+
+The provider block is used to configure the named provider, in this case google. A provider is responsible for creating and managing resources. Multiple provider blocks can exist if a 
+Terraform configuration manages resources from different providers.
+
+
+Example - 
+
+resource "google_compute_network" "vpc_network" {
+  name = "terraform-network"
+}
+
+resource "google_compute_instance" "vm_instance" {
+  name         = "terraform-instance"
+  machine_type = "e2-micro"
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-11"
+    }
+  }
+
+  network_interface {
+    network = google_compute_network.vpc_network.name
+    access_config {
+    }
+  }
+}
+
+
+Notice how this configuration refers to the network's name property with google_compute_network.vpc_network.name -- google_compute_network.vpc_network is the ID, matching the values in 
+the block that defines the network, and name is a property of that resource.
+
+The presence of the access_config block, even without any arguments, ensures that the instance will be accessible over the internet.
+
+NOTE - The prefix ~ means that Terraform will update the resource in-place. You can go and apply this change now by responding yes, and Terraform will add the tags to your instance.
+
+
+=> Destructive changes
+A destructive change is a change that requires the provider to replace the existing resource rather than updating it. This usually happens because the cloud provider doesn't support 
+updating the resource in the way described by your configuration. Changing the disk image of your instance is one example of a destructive change.
+
+The prefix -/+ means that Terraform will destroy and recreate the resource, rather than updating it in-place. While some attributes can be updated in-place 
+(which are shown with the ~ prefix), changing the boot disk image for an instance requires recreating it. Terraform and the Google Cloud provider handle these details for you, 
+and the execution plan makes it clear what Terraform will do.
+
+
+=> Destroying infrastructure
+
+Destroying your infrastructure is a rare event in production environments. But if you're using Terraform to spin up multiple environments such as development, testing, and staging, 
+then destroying is often a useful action.
+
+Resources can be destroyed using the terraform destroy command, which is similar to terraform apply but it behaves as if all of the resources have been removed from the configuration.
+
+
+NOTE - The - prefix indicates that the instance and the network will be destroyed. As with apply, Terraform shows its execution plan and waits for approval before making any changes.
+
+Just like with terraform apply, Terraform determines the order in which things must be destroyed. Google Cloud won't allow a VPC network to be deleted if there are resources still in it, 
+so Terraform waits until the instance is destroyed before destroying the network. When performing operations, Terraform creates a dependency graph to determine the correct order of 
+operations. In more complicated cases with multiple resources, Terraform will perform operations in parallel when it's safe to do so.
+
+
+
+=> Resource Dependencies 
+
+resource "google_compute_instance" "vm_instance" {
+  name         = "terraform-instance"
+  machine_type = "e2-micro"
+  tags         = ["web", "dev"]
+
+  boot_disk {
+    initialize_params {
+      image = "cos-cloud/cos-stable"
+    }
+  }
+
+  network_interface {
+    network = google_compute_network.vpc_network.self_link
+    access_config {
+      nat_ip = google_compute_address.vm_static_ip.address
+    }
+  }
+}
+
+resource "google_compute_address" "vm_static_ip" {
+  name = "terraform-static-ip"
+}
+
+The access_config block has several optional arguments, and in this case you'll set nat_ip to be the static IP address. When Terraform reads this configuration, it will:
+
+Ensure that vm_static_ip is created before vm_instance
+Save the properties of vm_static_ip in the state
+Set nat_ip to the value of the vm_static_ip.address property
+
+=> terraform plan -out static_ip
+
+Saving the plan this way ensures that you can apply exactly the same plan in the future. If you try to apply the file created by the plan, Terraform will first check to make sure the 
+exact same set of changes will be made before applying the plan.
+
+In this case, you can see that Terraform will create a new google_compute_address and update the existing VM to use it.
+
+=> terraform apply "static_ip"
+
+Terraform created the static IP before modifying the VM instance. Due to the interpolation expression that passes the IP address to the instance's network interface configuration, 
+Terraform is able to infer a dependency, and knows it must create the static IP before updating the instance.
+
+=> Implicit vs Explicit dependencies
+
+- Implicit dependencies via interpolation expressions are the primary way to inform Terraform about these relationships, and should be used whenever possible.
+
+- Sometimes there are dependencies between resources that are not visible to Terraform. The depends_on argument can be added to any resource and accepts a list of resources to create 
+explicit dependencies for.
+
+- For example, perhaps an application you will run on your instance expects to use a specific Cloud Storage bucket, but that dependency is configured inside the application code 
+and thus not visible to Terraform. In that case, you can use depends_on to explicitly declare the dependency.
+
+# New resource for the storage bucket our application will use.
+resource "google_storage_bucket" "example_bucket" {
+  name     = "qwiklabs-gcp-01-27f8816bd503-bucket-1"
+  location = "US"
+
+  website {
+    main_page_suffix = "index.html"
+    not_found_page   = "404.html"
+  }
+}
+
+# Create a new instance that uses the bucket
+resource "google_compute_instance" "another_instance" {
+  # Tells Terraform that this VM instance must be created only after the
+  # storage bucket has been created.
+  depends_on = [google_storage_bucket.example_bucket]
+
+  name         = "terraform-instance-2"
+  machine_type = "e2-micro"
+
+  boot_disk {
+    initialize_params {
+      image = "cos-cloud/cos-stable"
+    }
+  }
+
+  network_interface {
+    network = google_compute_network.vpc_network.self_link
+    access_config {
+    }
+  }
+}
+
+=> Provisioners
+
+Terraform uses provisioners to upload files, run shell scripts, or install and trigger other software like configuration management tools.
+
+resource "google_compute_instance" "vm_instance" {
+  name         = "terraform-instance"
+  machine_type = "e2-micro"
+  tags         = ["web", "dev"]
+
+provisioner "local-exec" {
+    command = "echo ${google_compute_instance.vm_instance.name}:  ${google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip} >> ip_address.txt"
+  }
+
+The local-exec provisioner executes a command locally on the machine running Terraform, not the VM instance itself.
+
+This also shows a more complex example of string interpolation than you've seen before. Each VM instance can have multiple network interfaces, so refer to the first one with 
+network_interface[0], count starting from 0, as most programming languages do. Each network interface can have multiple access_config blocks as well, so once again you specify the 
+first one.
+
+- Terraform treats provisioners differently from other arguments. Provisioners only run when a resource is created, but adding a provisioner does not force that resource to be destroyed 
+and recreated.
+
+Use terraform taint to tell Terraform to recreate the instance:
+- terraform taint google_compute_instance.vm_instance
+
+NOTE - 
+Failed provisioners and tainted resources
+
+If a resource is successfully created but fails a provisioning step, Terraform will error and mark the resource as tainted. A resource that is tainted still exists, but shouldn't 
+be considered safe to use, since provisioning failed.
+
+When you generate your next execution plan, Terraform will remove any tainted resources and create new resources, attempting to provision them again after creation.
+
+
+
+=> MODULES IN TERRAFORM
+
+Calling modules
+
+- Terraform commands will only directly use the configuration files in one directory, which is usually the current working directory. However, your configuration can use module blocks to 
+call modules in other directories. When Terraform encounters a module block, it loads and processes that module's configuration files.
+
+- A module that is called by another configuration is sometimes referred to as a "child module" of that configuration. Modules could be local as well as remote.
+
+- In many ways, Terraform modules are similar to the concepts of libraries, packages, or modules found in most programming languages, and they provide many of the same benefits. 
+
+- Use local modules to organize and encapsulate your code. Even if you aren't using or publishing remote modules, organizing your configuration in terms of modules from the beginning 
+  will significantly reduce the burden of maintaining and updating your configuration as your infrastructure grows in complexity.
+
+- Use the public Terraform Registry to find useful modules. This way you can quickly and confidently implement your configuration by relying on the work of others.
+
+- Publish and share modules with your team. Most infrastructure is managed by a team of people, and modules are an important tool that teams can use to create and maintain infrastructure.
+  As mentioned earlier, you can publish modules either publicly or privately.
+
+
+=> In order to use most modules, you will need to pass input variables to the module configuration. The configuration that calls a module is responsible for setting its input values, 
+which are passed as arguments to the module block. Aside from source and version, most of the arguments to a module block will set variable values.
+
+
+=> Modules also have output values, which are defined within the module with the output keyword. You can access them by referring to module.<MODULE NAME>.<OUTPUT NAME>. Like input 
+variables, module outputs are listed under the outputs tab in the Terraform Registry.
+
+
+Understand how modules work =>
+
+When using a new module for the first time, you must run either terraform init or terraform get to install the module. When either of these commands is run, Terraform will install 
+any new modules in the .terraform/modules directory within your configuration's working directory. For local modules, Terraform will create a symlink to the module's directory. 
+
+Because of this, any changes to local modules will be effective immediately, without your having to re-run terraform get. Module outputs are usually either passed to other parts of 
+your configuration or defined as outputs in your root module. 
+
+----FOLDER STRUCTURE IN TERRAFORM MODULE
+
+1.LICENSE contains the license under which your module will be distributed. When you share your module, the LICENSE file will let people using it know the terms under which it has been
+ made available. Terraform itself does not use this file.
+
+2. variables.tf contains the variable definitions for your module. When your module is used by others, the variables will be configured as arguments in the module block. Because all 
+Terraform values must be defined, any variables that don't have a default value will become required arguments. A variable with a default value can also be provided as a module argument, 
+thus overriding the default value.
+
+3. outputs.tf contains the output definitions for your module. Module outputs are made available to the configuration using the module, so they are often used to pass information about 
+the parts of your infrastructure defined by the module to other parts of your configuration.
+
+NOTE - Like variables, outputs in modules perform the same function as they do in the root module but are accessed in a different way. A module's outputs can be accessed as read-only 
+attributes on the module object, which is available within the configuration that calls the module.
+
+
+=> In addition, cloud providers almost always have API rate limiting, so Terraform can only request a limited number of resources in a period of time. Larger users of Terraform 
+frequently use both the -refresh=false flag and the -target flag in order to work around this. In these scenarios, the cached state is treated as the record of truth.
+
+Syncing
+In the default configuration, Terraform stores the state in a file in the current working directory where Terraform was run. This works when you are getting started, but when Terraform 
+is used in a team, it is important for everyone to be working with the same state so that operations will be applied to the same remote objects.
+
+=> State locking
+If supported by your backend, Terraform will lock your state for all operations that could write state. This prevents others from acquiring the lock and potentially corrupting your state.
+
+State locking happens automatically on all operations that could write state. You won't see any message that it is happening. If state locking fails, Terraform will not continue.
+ You can disable state locking for most commands with the -lock flag, but it is not recommended.
+
+
+=> Each Terraform configuration has an associated backend that defines how operations are executed and where persistent data such as the Terraform state is stored.
+
+The persistent data stored in the backend belongs to a workspace. Initially the backend has only one workspace, called default, and thus only one Terraform state is associated with that 
+configuration.
+
+Certain backends support multiple named workspaces, which allows multiple states to be associated with a single configuration. The configuration still has only one backend, but 
+multiple distinct instances of that configuration can be deployed without configuring a new backend or changing authentication credentials.
+
+NOTE - A backend in Terraform determines how state is loaded and how an operation such as apply is executed. This abstraction enables non-local file state storage, remote execution, etc.
+
+By default, Terraform uses the "local" backend, which is the normal behavior of Terraform you're used to. This is the backend that was being invoked throughout the previous labs.
+
+
+
+NOTE - When configuring a backend for the first time (moving from no defined backend to explicitly configuring one), Terraform will give you the option to migrate your state to the 
+new backend. This lets you adopt backends without losing any existing state.
+
+To be extra careful, we always recommend that you also manually back up your state. You can do this by simply copying your terraform.tfstate file to another location. 
+The initialization process should also create a backup, but it never hurts to be safe!
+
+NOTE -
+
+The init command must be called:
+
+On any new environment that configures a backend
+On any change of the backend configuration (including type of backend)
+On removing backend configuration completely
+
+=> ADD A CLOUD STORAGE (GCS) backend
+A Cloud Storage backend stores the state as an object in a configurable prefix in a given bucket on Cloud Storage. Supports state locking.
+
+
+=> The terraform refresh command is used to reconcile the state Terraform knows about (via its state file) with the real-world infrastructure. This can be used to detect any drift 
+from the last-known state and to update the state file.
+
+This does not modify infrastructure, but does modify the state file. If the state is changed, this may cause changes to occur during the next plan or apply.
+
+=> In the main.tf file, add the force_destroy = true argument to your google_storage_bucket resource. When you delete a bucket, this boolean option will 
+delete all contained objects. If you try to delete a bucket that contains objects, Terraform will fail that run.
+
+
+=> However, you may need to manage infrastructure that wasn’t created by Terraform. Terraform import solves this problem by loading supported resources into your Terraform workspace’s 
+state.
+
+The import command doesn’t automatically generate the configuration to manage the infrastructure, though. Because of this, importing existing infrastructure into Terraform is a 
+multi-step process.
+
+Bringing existing infrastructure under Terraform’s control involves five main steps:
+
+Identify the existing infrastructure to be imported.
+Import the infrastructure into your Terraform state.
+Write a Terraform configuration that matches that infrastructure.
+Review the Terraform plan to ensure that the configuration matches the expected state and infrastructure.
+Apply the configuration to update your Terraform state.
+
+
+=> There are two approaches to update the configuration in docker.tf to match the state you imported. You can either accept the entire current state of the resource into your configuration 
+as-is or select the required attributes into your configuration individually. Each of these approaches can be useful in different circumstances.
+
+Using the current state is often faster, but can result in an overly verbose configuration because every attribute is included in the state, whether it is necessary to include in your 
+configuration or not.
+
+Individually selecting the required attributes can lead to more manageable configuration, but requires you to understand which attributes need to be set in the configuration.
+
+
+=> Create image resource
+In some cases, you can bring resources under Terraform's control without using the terraform import command. This is often the case for resources that are defined by a single 
+unique ID or tag, such as Docker images.
+
+=> Terraform Destroy 
+
+Note: Because you added the image to both your Terraform configuration and the container, the image will be removed from both Docker and the container. If another container was using 
+the same image, the destroy step would fail. Remember that importing a resource into Terraform means that Terraform will manage the entire lifecycle of the resource, including destruction.
