@@ -25,3 +25,5 @@ Important notes along with other useful references to prepare for GCP's associat
 3. Global,Regional and Zonal resources - https://cloud.google.com/compute/docs/regions-zones/global-regional-zonal-resources
 
 4. Flashcards with QnAs - https://quizlet.com/328524759/flashcards?funnelUUID=b1d07049-b4c9-4504-afd4-ff12edba9f1e
+   
+5. Practice QnAs - https://www.whizlabs.com/blog/gcp-associate-cloud-engineer-questions/
