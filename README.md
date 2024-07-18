@@ -29,3 +29,7 @@ Important notes along with other useful references to prepare for GCP's associat
 5. Practice QnAs - https://www.whizlabs.com/blog/gcp-associate-cloud-engineer-questions/
 
 6. Networking End to End (Quite helpful in understanding the VPC related concepts) - https://www.youtube.com/playlist?list=PLIivdWyY5sqJ0oXcnZYqOnuNRsLF9H48u (check videos 1-9 in this playlist)
+
+7. Choosing the right load balancer - https://medium.com/google-cloud/choosing-the-right-load-balancer-9ec909148a85
+
+8. Understanding GCP Resource Hierarchy - https://cloud.in28minutes.com/gcp-certification-resource-hierarchy
