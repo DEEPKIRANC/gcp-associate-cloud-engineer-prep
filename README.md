@@ -27,3 +27,5 @@ Important notes along with other useful references to prepare for GCP's associat
 4. Flashcards with QnAs - https://quizlet.com/328524759/flashcards?funnelUUID=b1d07049-b4c9-4504-afd4-ff12edba9f1e
    
 5. Practice QnAs - https://www.whizlabs.com/blog/gcp-associate-cloud-engineer-questions/
+
+6. Networking End to End (Quite helpful in understanding the VPC related concepts) - https://www.youtube.com/playlist?list=PLIivdWyY5sqJ0oXcnZYqOnuNRsLF9H48u (check videos 1-9 in this playlist)
